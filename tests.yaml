@@ -1,0 +1,28 @@
+common:
+  harness: net
+  tags:
+    - net
+    - wifi
+sample:
+  description: Test wifi driver and APIs functionality
+  name: WiFi sample app
+tests:
+  sample.net.wifi:
+    platform_allow:
+      - esp32c5_devkitc/esp32c5/hpcore
+    integration_platforms:
+      - esp32c5_devkitc/esp32c5/hpcore
+  sample.net.wifi.esp32:
+    extra_args:
+      - CONFIG_BUILD_ONLY_NO_BLOBS=y
+    platform_allow:
+      - esp32c5_devkitc/esp32c5/hpcore
+  sample.net.wifi.esp32.enterprise:
+    extra_args:
+      - CONFIG_BUILD_ONLY_NO_BLOBS=y
+      - EXTRA_CONF_FILE=esp32/overlay_enterprise.conf
+    platform_allow:
+      - esp32c5_devkitc/esp32c5/hpcore
+    integration_platforms:
+      - esp32c5_devkitc/esp32c5/hpcore
+ 

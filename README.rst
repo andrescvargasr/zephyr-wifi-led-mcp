@@ -9,23 +9,105 @@ Overview
 
 This sample allows testing Wi-Fi drivers for various boards by
 enabling the Wi-Fi shell module that provides a set of commands:
-scan, connect, and disconnect.  It also enables the net_shell module
+scan, connect, and disconnect. It also enables the net_shell module
 to verify net_if settings.
+
+Target Boards
+=============
+
+Supported target boards include:
+
+- **ESP32-C5:** ``esp32c5_devkitc/esp32c5/hpcore`` (ESP32-C5 RISC-V High-Performance Core)
+- **Nordic nRF7002:** ``nrf7002dk/nrf5340/cpuapp``
+
+Environment Setup
+=================
+
+Activate the Python virtual environment before executing ``west`` commands:
+
+.. code-block:: console
+
+   zvenv
+   # or: source /home/camilo/zephyrproject/.venv/bin/activate
 
 Building and Running
 ********************
 
-Verify the board and chip you are targeting provide Wi-Fi support.
+Set Target Board Configuration
+==============================
 
-For instance you can use Nordic's nrf7002dk by selecting the nrf7002dk/nrf5340/cpuapp board.
+.. code-block:: console
 
-.. zephyr-app-commands::
-   :zephyr-app: samples/net/wifi/shell
-   :board: nrf7002dk/nrf5340/cpuapp
-   :goals: build
-   :compact:
+   west config build.board esp32c5_devkitc/esp32c5/hpcore
 
-Sample console interaction
+Build Commands
+==============
+
+Incremental build using configured board:
+
+.. code-block:: console
+
+   west build
+
+Pristine (clean) build for ESP32-C5:
+
+.. code-block:: console
+
+   west build -p always -b esp32c5_devkitc/esp32c5/hpcore
+
+Build with Kconfig overlay (e.g. debug overlay):
+
+.. code-block:: console
+
+   west build -b esp32c5_devkitc/esp32c5/hpcore -- -DEXTRA_CONF_FILE="overlay-debug.conf"
+
+Build with Snippets
+=====================
+
+You can enable and test various snippets incrementally:
+
+1. **Add `wifi-credentials` and test it:**
+
+   .. code-block:: console
+
+      west build -p -S wifi-credentials
+
+2. **Add `espressif-psram-8M` and test it:**
+
+   .. code-block:: console
+
+      west build -p -S wifi-credentials -S espressif-psram-8M
+
+3. **Add `espressif-psram-wifi` and test it:**
+
+   .. code-block:: console
+
+      west build -p -S wifi-credentials -S espressif-psram-8M -S espressif-psram-wifi
+
+
+Flashing to Hardware
+====================
+
+Default flash command:
+
+.. code-block:: console
+
+   west flash
+
+Flashing specifying serial/USB port:
+
+.. code-block:: console
+
+   # Windows serial port
+   west flash --esp-device COM17
+
+   # Linux USB native port (ESP32-C5)
+   west flash --esp-device /dev/ttyACM0
+
+   # Linux Serial-to-USB port (ESP32-C5)
+   west flash --esp-device /dev/ttyUSB0
+
+Sample Console Interaction
 ==========================
 
 .. code-block:: console
