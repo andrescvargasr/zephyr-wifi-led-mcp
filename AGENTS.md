@@ -29,23 +29,33 @@ The Zephyr environment relies on a dedicated Python virtual environment:
 ## 3. Project Structure & Features
 
 ```
-wifi-shell/
+zephyr-wifi/
 ├── .gitignore                  # Git ignore rules for build artifacts and temporary files
-├── CMakeLists.txt              # CMake build script (appends default snippets prior to find_package)
+├── CMakeLists.txt              # CMake build script (appends default snippets and includes include/)
+├── Kconfig                     # Application Kconfig options (LED brightness, update delay)
+├── VERSION                     # Project version file
+├── app.overlay                 # Devicetree overlay for WS2812 LED strip (I2S/DMA)
 ├── prj.conf                    # Main Kconfig application configuration
 ├── overlay-debug.conf          # Debug Kconfig overlay configuration
 ├── README.rst                  # Documentation, snippet testing guide, and sample logs
 ├── tests.yaml                  # Twister test configuration for automated test runs
 ├── esp32/
 │   └── overlay_enterprise.conf # Kconfig overlay for ESP32 WPA Enterprise features
+├── include/
+│   ├── params.h                # Global configuration structures and thread parameter definitions
+│   └── thd_led.h               # Header file declaring LED strip thread functions
 ├── src/
-│   └── wifi_test.c             # Application entry point: prints PSRAM size, registers callbacks, auto-connects
+│   ├── _start_threads.c        # Thread initialization boilerplate (defines thd_led thread)
+│   ├── thd_led.c               # LED strip HSV thread function with 5-second periodic logging
+│   └── wifi_test.c             # Wi-Fi test module, auto-connect, and event management
 └── build/                      # Generated build artifacts (managed by west)
 ```
 
-### Application Features (`src/wifi_test.c`)
+### Application Features & Threads
+- **LED Strip Thread (`src/thd_led.c`):** Runs the WS2812 RGB LED strip driven over I2S/DMA via `app.overlay`. Animates HSV rainbow colors and logs status every 5 seconds.
+- **Thread Management (`src/_start_threads.c`):** Boilerplate defining system threads (e.g. `thd_led`) using `K_THREAD_DEFINE`.
+- **Wi-Fi Module (`src/wifi_test.c`):** Handles Wi-Fi status callbacks, DHCP event notifications, and auto-connection using saved credentials in NVS.
 - **PSRAM Size Output:** Queries and prints detected PSRAM size on startup using `esp_psram_get_size()` or Devicetree properties.
-- **Auto-Connect on Startup:** Automatically attempts connection to saved Wi-Fi credentials stored in flash memory via `auto_connect()`.
 - **Net Management Callbacks:** Subscribes to `NET_EVENT_WIFI_CONNECT_RESULT`, `NET_EVENT_WIFI_DISCONNECT_RESULT`, and `NET_EVENT_IPV4_DHCP_BOUND`. Note: Callback handlers must use `uint64_t mgmt_event` parameter type per Zephyr 4.4+ signature specifications.
 
 ### Default Snippets (`CMakeLists.txt`)

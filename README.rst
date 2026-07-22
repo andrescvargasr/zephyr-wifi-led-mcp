@@ -12,6 +12,9 @@ enabling the Wi-Fi shell module that provides a set of commands:
 scan, connect, and disconnect. It also enables the net_shell module
 to verify net_if settings.
 
+Additionally, it includes multi-threading support via ``_start_threads.c``,
+featuring a dedicated WS2812 LED strip RGB/HSV thread (``thd_led.c``) using I2S/DMA.
+
 Target Boards
 =============
 
@@ -19,6 +22,18 @@ Supported target boards include:
 
 - **ESP32-C5:** ``esp32c5_devkitc/esp32c5/hpcore`` (ESP32-C5 RISC-V High-Performance Core)
 - **Nordic nRF7002:** ``nrf7002dk/nrf5340/cpuapp``
+
+Project Structure
+=================
+
+- ``app.overlay``: Devicetree overlay configuring WS2812 LED strip over I2S/DMA.
+- ``Kconfig``: Sample configuration options for LED brightness and update delay.
+- ``VERSION``: Application version metadata file.
+- ``include/params.h``: Shared application parameters and data structures.
+- ``include/thd_led.h``: Function prototypes for the LED thread module.
+- ``src/_start_threads.c``: Thread management boilerplate defining and launching system threads (e.g. ``thd_led``).
+- ``src/thd_led.c``: WS2812 LED strip thread function implementing smooth HSV rainbow cycling and periodic logging (every 5 seconds).
+- ``src/wifi_test.c``: Wi-Fi driver, auto-connect, and event management module.
 
 Environment Setup
 =================
@@ -128,3 +143,4 @@ Sample Console Interaction
    shell>
    Connected
    shell>
+
