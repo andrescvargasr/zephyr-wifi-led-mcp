@@ -19,6 +19,8 @@
 #include <esp_psram.h>
 #endif
 
+#include "thd_mcp.h"
+
 LOG_MODULE_REGISTER(wifi_test, LOG_LEVEL_INF);
 
 static struct net_mgmt_event_callback wifi_mgmt_cb;
@@ -120,6 +122,10 @@ int main(void)
 
 	/* Trigger auto-connect on startup */
 	auto_connect();
+
+	k_sleep(K_SECONDS(20));
+
+	thread_mcp();
 
 	return 0;
 }

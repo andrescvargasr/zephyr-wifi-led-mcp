@@ -38,5 +38,5 @@
 /******************************************************************************/
 #ifdef THD_LED
 K_THREAD_DEFINE(thd_led, THD_STACKSIZE, thread_led, NULL, NULL, NULL,
-				THREAD_LED_PRIORITY, 0, 0);
+				THREAD_LED_PRIORITY, 0, (0 * DELAY_THD));
 #endif // End THD_LED
