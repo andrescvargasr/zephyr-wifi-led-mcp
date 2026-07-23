@@ -15,6 +15,10 @@ to verify net_if settings.
 Additionally, it includes multi-threading support via ``_start_threads.c``,
 featuring a dedicated WS2812 LED strip RGB/HSV thread (``thd_led.c``) using I2S/DMA.
 
+It also integrates a Model Context Protocol (MCP) HTTP server (``src/mcp_server.c``)
+listening on port 8080 (endpoint ``/mcp``) to expose remote AI tools over HTTP and interact
+with system hardware via Zbus message channels (``include/led_zbus.h``).
+
 Target Boards
 =============
 
@@ -29,11 +33,22 @@ Project Structure
 - ``app.overlay``: Devicetree overlay configuring WS2812 LED strip over I2S/DMA.
 - ``Kconfig``: Sample configuration options for LED brightness and update delay.
 - ``VERSION``: Application version metadata file.
+- ``include/led_zbus.h``: Zbus channel and message declarations for LED control.
+- ``include/mcp_server.h``: Function prototypes and interface for the MCP HTTP server.
 - ``include/params.h``: Shared application parameters and data structures.
 - ``include/thd_led.h``: Function prototypes for the LED thread module.
 - ``src/_start_threads.c``: Thread management boilerplate defining and launching system threads (e.g. ``thd_led``).
+- ``src/mcp_server.c``: MCP HTTP server implementation, registering tools (``delayed_response``, ``led_control``) and publishing Zbus messages.
 - ``src/thd_led.c``: WS2812 LED strip thread function implementing smooth HSV rainbow cycling and periodic logging (every 5 seconds).
-- ``src/wifi_test.c``: Wi-Fi driver, auto-connect, and event management module.
+- ``src/wifi_test.c``: Wi-Fi driver, auto-connect, event management, and MCP server startup.
+
+Model Context Protocol (MCP) Server
+===================================
+
+The application features an HTTP-based MCP server running on port 8080 (endpoint ``/mcp``) with hostname ``mcp-hello-world``. The server exposes remote tools that can be invoked by MCP clients or AI assistants:
+
+- **``delayed_response``**: A test tool demonstrating asynchronous execution, SSE ping keep-alives, and cancellation support.
+- **``led_control``**: Enables remote control of the WS2812 RGB LED strip over Zbus (``led_chan``). Accepts actions: ``on``, ``off``, ``toggle``, ``red``, ``green``, and ``blue``.
 
 Environment Setup
 =================

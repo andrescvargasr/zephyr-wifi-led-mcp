@@ -9,7 +9,7 @@ This file provides workspace context, build instructions, and development guidel
 - **Project Name:** `wifi-shell`
 - **Path:** `/home/camilo/zephyrproject/projects/wifi-shell`
 - **RTOS:** Zephyr RTOS (v4.4.99+, located at `/home/camilo/zephyrproject/zephyr`)
-- **Primary Purpose:** Test Wi-Fi driver functionality, Wi-Fi shell commands (`wifi scan`, `wifi connect`, `wifi disconnect`), network stack management (`net_shell`, `net_if`), PSRAM allocation/relocation, and auto-connection with stored Wi-Fi credentials upon boot.
+- **Primary Purpose:** Test Wi-Fi driver functionality, Wi-Fi shell commands (`wifi scan`, `wifi connect`, `wifi disconnect`), network stack management (`net_shell`, `net_if`), PSRAM allocation/relocation, auto-connection with stored Wi-Fi credentials upon boot, and HTTP Model Context Protocol (MCP) server tool execution with Zbus hardware control integration.
 - **Target Board / Architecture:** Default configured board is `esp32c5_devkitc/esp32c5/hpcore` (ESP32-C5 RISC-V High-Performance Core). Can also target Nordic `nrf7002dk/nrf5340/cpuapp` or other supported Wi-Fi boards.
 
 ---
@@ -42,19 +42,25 @@ zephyr-wifi/
 ├── esp32/
 │   └── overlay_enterprise.conf # Kconfig overlay for ESP32 WPA Enterprise features
 ├── include/
+│   ├── led_zbus.h              # Zbus channel and message structures for LED control
+│   ├── mcp_server.h            # Header file declaring MCP HTTP server interface
 │   ├── params.h                # Global configuration structures and thread parameter definitions
 │   └── thd_led.h               # Header file declaring LED strip thread functions
 ├── src/
 │   ├── _start_threads.c        # Thread initialization boilerplate (defines thd_led thread)
+│   ├── mcp_server.c            # MCP HTTP server initialization, tool callbacks, and Zbus publishing
 │   ├── thd_led.c               # LED strip HSV thread function with 5-second periodic logging
-│   └── wifi_test.c             # Wi-Fi test module, auto-connect, and event management
+│   └── wifi_test.c             # Wi-Fi test module, auto-connect, event management, and MCP initialization
 └── build/                      # Generated build artifacts (managed by west)
 ```
 
 ### Application Features & Threads
 - **LED Strip Thread (`src/thd_led.c`):** Runs the WS2812 RGB LED strip driven over I2S/DMA via `app.overlay`. Animates HSV rainbow colors and logs status every 5 seconds.
 - **Thread Management (`src/_start_threads.c`):** Boilerplate defining system threads (e.g. `thd_led`) using `K_THREAD_DEFINE`.
-- **Wi-Fi Module (`src/wifi_test.c`):** Handles Wi-Fi status callbacks, DHCP event notifications, and auto-connection using saved credentials in NVS.
+- **Wi-Fi Module (`src/wifi_test.c`):** Handles Wi-Fi status callbacks, DHCP event notifications, auto-connection using saved credentials in NVS, and launches the MCP server.
+- **MCP HTTP Server & Zbus (`src/mcp_server.c`, `include/mcp_server.h`, `include/led_zbus.h`):** Runs an HTTP MCP server listening on port 8080 (`/mcp` endpoint) under hostname `mcp-hello-world`. Registers MCP tools:
+  - `delayed_response`: Asynchronous tool for SSE ping keep-alive and cancellation testing.
+  - `led_control`: Remote LED command tool publishing to Zbus channel `led_chan` (`on`, `off`, `toggle`, `red`, `green`, `blue`).
 - **PSRAM Size Output:** Queries and prints detected PSRAM size on startup using `esp_psram_get_size()` or Devicetree properties.
 - **Net Management Callbacks:** Subscribes to `NET_EVENT_WIFI_CONNECT_RESULT`, `NET_EVENT_WIFI_DISCONNECT_RESULT`, and `NET_EVENT_IPV4_DHCP_BOUND`. Note: Callback handlers must use `uint64_t mgmt_event` parameter type per Zephyr 4.4+ signature specifications.
 
@@ -134,6 +140,9 @@ west twister -T .
   - `CONFIG_NET_L2_WIFI_SHELL=y` - Enable Wi-Fi shell commands.
   - `CONFIG_NET_SHELL=y` - Enable network interface shell commands.
   - `CONFIG_NET_MGMT_EVENT_QUEUE_SIZE` / `CONFIG_NET_MGMT_EVENT_QUEUE_TIMEOUT` - Tuned for Wi-Fi scan results processing without queue overflows.
+  - `CONFIG_MCP_SERVER=y` - Enable Model Context Protocol (MCP) server library.
+  - `CONFIG_MCP_HTTP_PORT=8080` / `CONFIG_MCP_HTTP_ENDPOINT="/mcp"` - MCP HTTP server port and endpoint.
+  - `CONFIG_MCP_MAX_TOOLS=4` / `CONFIG_MCP_REQUEST_WORKERS=2` - MCP tool capacity and worker thread allocations.
 
 ### Devicetree (`.dts` / `.overlay`)
 - If hardware pin assignments or peripheral nodes need customization, add a board overlay file in `boards/<board_name>.overlay`.
