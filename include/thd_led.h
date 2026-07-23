@@ -11,6 +11,7 @@
 #define THD_LED_H
 
 #include "params.h"
+#include "led_zbus.h"
 
 #ifdef THD_LED
 // Thread

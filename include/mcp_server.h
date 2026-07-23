@@ -1,5 +1,5 @@
 /**
- * @file thd_mcp.h
+ * @file mcp_server.h
  * @author Andres C. Vargas R. (camilo.vargas@technaid.com gh: @andrescvargasr)
  * @brief
  * @version 0.1
@@ -7,14 +7,11 @@
  *
  *
  */
-#ifndef THD_MCP_H
-#define THD_MCP_H
+#ifndef MCP_SERVER_H
+#define MCP_SERVER_H
 
 #include "params.h"
 
-#ifdef THD_MCP
-// Thread
-int thread_mcp(void);
-#endif // End THD_MCP
+int mcp_server(void);
 
-#endif // End THD_MCP_H
+#endif // End MCP_SERVER_H

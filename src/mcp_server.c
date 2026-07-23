@@ -8,6 +8,9 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net/mcp/mcp_server.h>
 #include <zephyr/net/mcp/mcp_server_http.h>
+#include <zephyr/zbus/zbus.h>
+
+#include "led_zbus.h"
 
 LOG_MODULE_REGISTER(mcp_sample_hello, LOG_LEVEL_INF);
 
@@ -176,22 +179,47 @@ static int led_control_tool_callback(enum mcp_tool_event_type event,
 
 	action = extract_json_string_value(arguments, "\"action\"");
 
+	bool valid_action = true;
+	struct led_msg msg;
+
 	if ((action != NULL) && (strcmp(action, "on") == 0)) {
-		// ret = gpio_pin_set_dt(&led, 1);
-        printk("LED turned ON\n");
-		snprintk(response_buffer, sizeof(response_buffer), "LED turned ON");
+		msg.action = LED_ACTION_ON;
+		printk("Zbus publishing: LED ON\n");
+		snprintk(response_buffer, sizeof(response_buffer), "LED turned ON via Zbus");
 	} else if ((action != NULL) && (strcmp(action, "off") == 0)) {
-		// ret = gpio_pin_set_dt(&led, 0);
-        printk("LED turned OFF\n");
-		snprintk(response_buffer, sizeof(response_buffer), "LED turned OFF");
+		msg.action = LED_ACTION_OFF;
+		printk("Zbus publishing: LED OFF\n");
+		snprintk(response_buffer, sizeof(response_buffer), "LED turned OFF via Zbus");
 	} else if ((action != NULL) && (strcmp(action, "toggle") == 0)) {
-		// ret = gpio_pin_toggle_dt(&led);
-        printk("LED toggled");
-		snprintk(response_buffer, sizeof(response_buffer), "LED toggled");
+		msg.action = LED_ACTION_TOGGLE;
+		printk("Zbus publishing: LED TOGGLE\n");
+		snprintk(response_buffer, sizeof(response_buffer), "LED toggled via Zbus");
+	} else if ((action != NULL) && (strcmp(action, "red") == 0)) {
+		msg.action = LED_ACTION_RED;
+		printk("Zbus publishing: LED RED\n");
+		snprintk(response_buffer, sizeof(response_buffer), "LED turned red via Zbus");
+	} else if ((action != NULL) && (strcmp(action, "green") == 0)) {
+		msg.action = LED_ACTION_GREEN;
+		printk("Zbus publishing: LED GREEN\n");
+		snprintk(response_buffer, sizeof(response_buffer), "LED turned green via Zbus");
+	} else if ((action != NULL) && (strcmp(action, "blue") == 0)) {
+		msg.action = LED_ACTION_BLUE;
+		printk("Zbus publishing: LED BLUE\n");
+		snprintk(response_buffer, sizeof(response_buffer), "LED turned blue via Zbus");
 	} else {
-        printk("Invalid action. Use: on, off, or toggle");
+		valid_action = false;
+		printk("Invalid action. Use: on, off, toggle, red, green, or blue\n");
 		snprintk(response_buffer, sizeof(response_buffer),
-				"Invalid action. Use: on, off, or toggle");
+				"Invalid action. Use: on, off, toggle, red, green, or blue");
+	}
+
+	if (valid_action) {
+		int pub_rc = zbus_chan_pub(&led_chan, &msg, K_MSEC(200));
+		if (pub_rc != 0) {
+			printk("Zbus publish failed with error %d\n", pub_rc);
+			snprintk(response_buffer, sizeof(response_buffer),
+				 "Zbus publish failed: %d", pub_rc);
+		}
 	}
 
 	response = (struct mcp_tool_message){
@@ -244,14 +272,14 @@ static const struct mcp_tool_record led_control_tool = {
 			"\"properties\":{"
 				"\"action\":{"
 					"\"type\":\"string\","
-					"\"enum\":[\"on\",\"off\",\"toggle\"],"
+					"\"enum\":[\"on\",\"off\",\"toggle\",\"red\",\"green\",\"blue\"],"
 					"\"description\":\"The LED action to perform\""
 				"}"
 			"},"
 			"\"required\":[\"action\"]"
 			"}",
 #ifdef CONFIG_MCP_TOOL_DESC
-			.description = "Controls the LED based on input command (on/off/toggle)",
+			.description = "Controls the LED based on input command (on/off/toggle/red/green/blue)",
 #endif
 #ifdef CONFIG_MCP_TOOL_TITLE
 			.title = "LED Control Tool",
@@ -264,7 +292,7 @@ static const struct mcp_tool_record led_control_tool = {
 	.callback = led_control_tool_callback
 };
 
-int thread_mcp(void)
+int mcp_server(void)
 {
 	int ret;
 

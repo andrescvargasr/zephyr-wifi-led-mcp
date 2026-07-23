@@ -19,7 +19,7 @@
 #include <esp_psram.h>
 #endif
 
-#include "thd_mcp.h"
+#include "mcp_server.h"
 
 LOG_MODULE_REGISTER(wifi_test, LOG_LEVEL_INF);
 
@@ -125,7 +125,7 @@ int main(void)
 
 	k_sleep(K_SECONDS(20));
 
-	thread_mcp();
+	mcp_server();
 
 	return 0;
 }
