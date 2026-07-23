@@ -21,6 +21,8 @@
 #define THD_STACKSIZE 512 // Should always be a power of two.
 #define THREAD_LED_PRIORITY K_PRIO_PREEMPT(2)
 
+#define DELAY_THD 10 // ms
+
 /******************************************************************************/
 /*                          Zephyr Workqueue Table	                          */
 /******************************************************************************/
