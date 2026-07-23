@@ -23,6 +23,8 @@
 
 LOG_MODULE_REGISTER(wifi_test, LOG_LEVEL_INF);
 
+static struct k_sem wifi_connected_sem;
+
 static struct net_mgmt_event_callback wifi_mgmt_cb;
 static struct net_mgmt_event_callback dhcp_mgmt_cb;
 
@@ -35,6 +37,7 @@ static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 	if (mgmt_event == NET_EVENT_WIFI_CONNECT_RESULT) {
 		if (status->status == 0) {
 			LOG_INF("Wi-Fi connected successfully!");
+			k_sem_give(&wifi_connected_sem);
 		} else {
 			LOG_ERR("Wi-Fi connection failed (status: %d)", status->status);
 		}
@@ -109,6 +112,8 @@ int main(void)
 
 	LOG_INF("Starting Wi-Fi Shell application...");
 
+	k_sem_init(&wifi_connected_sem, 0, 1);
+
 	/* Register Wi-Fi event callbacks */
 	net_mgmt_init_event_callback(&wifi_mgmt_cb, wifi_mgmt_event_handler,
 				      NET_EVENT_WIFI_CONNECT_RESULT |
@@ -123,9 +128,11 @@ int main(void)
 	/* Trigger auto-connect on startup */
 	auto_connect();
 
-	k_sleep(K_SECONDS(20));
+	k_sem_take(&wifi_connected_sem, K_FOREVER);
 
 	mcp_server();
+
+	k_sem_give(&wifi_connected_sem);
 
 	return 0;
 }
