@@ -159,3 +159,111 @@ Sample Console Interaction
    Connected
    shell>
 
+Testing MCP Client with Python
+==============================
+
+A Python test script is available in ``/home/camilo/zephyrproject/projects/test_mcp_python_code/control_led.py`` to test the connection and issue remote commands to the MCP HTTP server.
+
+Connection Requirements
+-----------------------
+
+1. **Host Environment:**
+   * Python 3.x (uses built-in ``urllib.request`` and ``json`` libraries).
+   * The host machine running the script must be on the same Wi-Fi / LAN network as the target board.
+   * Host OS must support mDNS to resolve ``http://mcp-hello-world.local:8080/mcp``. If mDNS is disabled, replace the hostname with the board's IPv4 address.
+
+2. **Target Device Configuration:**
+   * Active Wi-Fi network connection with an assigned IPv4 address via DHCP.
+   * mDNS Responder enabled (``CONFIG_MDNS_RESPONDER=y``, ``CONFIG_NET_HOSTNAME="mcp-hello-world"``).
+   * MCP HTTP Server configured on port 8080 at endpoint ``/mcp`` (``CONFIG_MCP_SERVER=y``, ``CONFIG_MCP_HTTP_PORT=8080``, ``CONFIG_MCP_HTTP_ENDPOINT="/mcp"``).
+   * Active Zbus subscriber channel ``led_chan`` and LED strip thread (``thd_led.c``).
+
+3. **MCP JSON-RPC 2.0 Handshake Flow:**
+
+   To establish a successful connection, the server must support the 3-step MCP sequence executed by ``control_led.py``:
+
+   * **Step 1: Session Initialization (initialize)**
+
+     Request:
+
+     .. code-block:: json
+
+        {
+          "jsonrpc": "2.0",
+          "id": 0,
+          "method": "initialize",
+          "params": {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": { "name": "antigravity-client", "version": "1.0.0" }
+          }
+        }
+
+     *Server Requirement:* Return HTTP 200 OK with header ``Mcp-Session-Id`` and JSON response confirming protocol version and server capabilities.
+
+   * **Step 2: Initialization Notification (notifications/initialized)**
+
+     Request:
+
+     .. code-block:: json
+
+        {
+          "jsonrpc": "2.0",
+          "method": "notifications/initialized"
+        }
+
+     *Server Requirement:* Accept notification without error (HTTP 200 or 204).
+
+   * **Step 3: Tool Execution (tools/call)**
+
+     Request:
+
+     .. code-block:: json
+
+        {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "led_control",
+            "arguments": {
+              "action": "on|off|toggle|red|green|blue"
+            }
+          }
+        }
+
+     *Server Requirement:* Execute the hardware action on the RGB LED and return:
+
+     .. code-block:: json
+
+        {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "result": {
+            "content": [
+              {
+                "type": "text",
+                "text": "LED turned ON via Zbus"
+              }
+            ]
+          }
+        }
+
+Running the Script
+------------------
+
+.. code-block:: console
+
+   cd /home/camilo/zephyrproject/projects/test_mcp_python_code
+
+   # Turn LED on / off / toggle
+   python control_led.py on
+   python control_led.py off
+   python control_led.py toggle
+
+   # Set LED color
+   python control_led.py red
+   python control_led.py green
+   python control_led.py blue
+
+
