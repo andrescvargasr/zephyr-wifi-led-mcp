@@ -11,7 +11,7 @@ list(APPEND SNIPPET
 set(SNIPPET "${SNIPPET}" CACHE STRING "Default snippets")
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(zephyr-wifi)
+project(zephyr-wifi-led-mcp)
 
 # Include external headers
 zephyr_include_directories(include)
