@@ -137,6 +137,19 @@ Flashing specifying serial/USB port:
    # Linux Serial-to-USB port (ESP32-C5)
    west flash --esp-device /dev/ttyUSB0
 
+Serial Monitor
+==============
+
+Launch the serial monitor to view system logs and interact with the Zephyr shell:
+
+.. code-block:: console
+
+   # USB native port on Linux (ESP32-C5)
+   west espressif monitor -p /dev/ttyACM0
+
+   # Serial-to-USB port on Linux (ESP32-C5)
+   west espressif monitor -p /dev/ttyUSB0
+
 Sample Console Interaction
 ==========================
 
