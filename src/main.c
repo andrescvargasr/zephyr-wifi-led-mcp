@@ -37,7 +37,7 @@ static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 	if (mgmt_event == NET_EVENT_WIFI_CONNECT_RESULT) {
 		if (status->status == 0) {
 			LOG_INF("Wi-Fi connected successfully!");
-			k_sem_give(&wifi_connected_sem);
+			k_sem_give(&wifi_connected_sem);	// Send signal to main thread to continue execution
 		} else {
 			LOG_ERR("Wi-Fi connection failed (status: %d)", status->status);
 		}
@@ -107,7 +107,7 @@ int main(void)
 	       DT_PROP(DT_NODELABEL(psram0), size),
 	       DT_PROP(DT_NODELABEL(psram0), size) / (1024 * 1024));
 #else
-	printk("PSRAM not available\n");
+	LOG_WRN("PSRAM not available");
 #endif
 
 	LOG_INF("Starting Wi-Fi Shell application...");
@@ -128,6 +128,7 @@ int main(void)
 	/* Trigger auto-connect on startup */
 	auto_connect();
 
+	/* Wait for Wi-Fi connection (signal from event handler) */
 	k_sem_take(&wifi_connected_sem, K_FOREVER);
 
 	mcp_server();

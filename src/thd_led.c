@@ -47,6 +47,14 @@ ZBUS_CHAN_DEFINE(led_chan,
 		 ZBUS_MSG_INIT(.action = LED_ACTION_ON)
 );
 
+ZBUS_CHAN_DEFINE(led_ready_chan,
+		 struct led_ready_msg,
+		 NULL,
+		 NULL,
+		 ZBUS_OBSERVERS_EMPTY,
+		 ZBUS_MSG_INIT(.is_ready = false, .status = -ENODEV)
+);
+
 enum led_mode {
 	LED_MODE_OFF,
 	LED_MODE_RAINBOW,
@@ -79,13 +87,24 @@ static void hsv_to_rgb(uint16_t h, uint8_t *r, uint8_t *g, uint8_t *b)
 
 int led_is_ready(void)
 {
+	struct led_ready_msg ready_msg = {0};
+
 	if (device_is_ready(strip)) {
 		LOG_INF("Found LED strip device %s", strip->name);
+		ready_msg.is_ready = true;
+		ready_msg.status = 0;
 	} else {
 		LOG_ERR("LED strip device %s is not ready", strip->name);
-		return -ENODEV;
+		ready_msg.is_ready = false;
+		ready_msg.status = -ENODEV;
 	}
-	return 0;
+
+	int pub_rc = zbus_chan_pub(&led_ready_chan, &ready_msg, K_MSEC(100));
+	if (pub_rc != 0) {
+		LOG_ERR("Failed to publish LED ready status to Zbus: %d", pub_rc);
+	}
+
+	return ready_msg.status;
 }
 
 int led_set(uint8_t r, uint8_t g, uint8_t b)

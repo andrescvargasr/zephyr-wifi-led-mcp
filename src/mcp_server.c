@@ -12,14 +12,12 @@
 
 #include "led_zbus.h"
 
-LOG_MODULE_REGISTER(mcp_sample_hello, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(mcp_app_server, LOG_LEVEL_INF);
 
-// #define LED0_NODE DT_ALIAS(led0)
 #define DELAYED_RESPONSE_TEXT "Hello from the delayed response tool!"
 
 mcp_server_ctx_t server;
 
-// static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 static bool led_initialized;
 
 /* Tool helper function */
@@ -78,63 +76,6 @@ static const char *extract_json_string_value(const char *json, const char *key)
 }
 
 /**
- * @brief Simplified callback that will trigger the SSE-style response. Can be used to test
- * that the client reacts appropriately. Shows the necessary ping and cancel mechanisms required
- * from tool callbacks by the MCP Server state machine.
- *
- * @param event MCP tool event type, either a call request or a cancel request
- * @param arguments Arguments sent by the client requesting this call request
- * @param execution_token Token that identifies the execution
- *
- * @return 0 on success, negative errno on failure
- */
-static int delayed_response_tool_callback(enum mcp_tool_event_type event,
-					const char *arguments, const char *execution_token)
-{
-	struct mcp_tool_message response;
-	struct mcp_tool_message ping;
-
-	if (event == MCP_TOOL_CANCEL_REQUEST) {
-		struct mcp_tool_message cancel_ack = {
-			.type = MCP_USR_TOOL_CANCEL_ACK,
-			.data = NULL,
-			.length = 0
-		};
-
-		mcp_server_submit_tool_message(server, &cancel_ack, execution_token);
-
-		/* Handle cancellation */
-
-		return 0;
-	}
-
-	response = (struct mcp_tool_message){
-		.type = MCP_USR_TOOL_RESPONSE,
-		.data = DELAYED_RESPONSE_TEXT,
-		.length = strlen(DELAYED_RESPONSE_TEXT)
-	};
-
-	ping = (struct mcp_tool_message){
-		.type = MCP_USR_TOOL_PING,
-		.data = NULL,
-		.length = 0
-	};
-
-	k_msleep(3000);
-	mcp_server_submit_tool_message(server, &ping, execution_token);
-	k_msleep(3000);
-	mcp_server_submit_tool_message(server, &ping, execution_token);
-	k_msleep(3000);
-	mcp_server_submit_tool_message(server, &ping, execution_token);
-	k_msleep(3000);
-
-	printk("Delayed response tool executed with arguments: %s, token: %s\n",
-		arguments ? arguments : "none", execution_token);
-
-	return mcp_server_submit_tool_message(server, &response, execution_token);
-}
-
-/**
  * @brief LED tool callback that serves as a simple reference for tool definitions
  *
  * @param event MCP tool event type, either a call request or a cancel request
@@ -165,6 +106,11 @@ static int led_control_tool_callback(enum mcp_tool_event_type event,
 		return 0;
 	}
 
+	struct led_ready_msg ready_msg = {0};
+	if (zbus_chan_read(&led_ready_chan, &ready_msg, K_NO_WAIT) == 0) {
+		led_initialized = ready_msg.is_ready;
+	}
+
 	if (!led_initialized) {
 		struct mcp_tool_message error_response = {
 			.type = MCP_USR_TOOL_RESPONSE,
@@ -175,8 +121,6 @@ static int led_control_tool_callback(enum mcp_tool_event_type event,
 		return -ENODEV;
 	}
 
-	printk("received arguments: %s\n", arguments ? arguments : "none");
-
 	action = extract_json_string_value(arguments, "\"action\"");
 
 	bool valid_action = true;
@@ -184,31 +128,25 @@ static int led_control_tool_callback(enum mcp_tool_event_type event,
 
 	if ((action != NULL) && (strcmp(action, "on") == 0)) {
 		msg.action = LED_ACTION_ON;
-		printk("Zbus publishing: LED ON\n");
 		snprintk(response_buffer, sizeof(response_buffer), "LED turned ON via Zbus");
 	} else if ((action != NULL) && (strcmp(action, "off") == 0)) {
 		msg.action = LED_ACTION_OFF;
-		printk("Zbus publishing: LED OFF\n");
 		snprintk(response_buffer, sizeof(response_buffer), "LED turned OFF via Zbus");
 	} else if ((action != NULL) && (strcmp(action, "toggle") == 0)) {
 		msg.action = LED_ACTION_TOGGLE;
-		printk("Zbus publishing: LED TOGGLE\n");
 		snprintk(response_buffer, sizeof(response_buffer), "LED toggled via Zbus");
 	} else if ((action != NULL) && (strcmp(action, "red") == 0)) {
 		msg.action = LED_ACTION_RED;
-		printk("Zbus publishing: LED RED\n");
 		snprintk(response_buffer, sizeof(response_buffer), "LED turned red via Zbus");
 	} else if ((action != NULL) && (strcmp(action, "green") == 0)) {
 		msg.action = LED_ACTION_GREEN;
-		printk("Zbus publishing: LED GREEN\n");
 		snprintk(response_buffer, sizeof(response_buffer), "LED turned green via Zbus");
 	} else if ((action != NULL) && (strcmp(action, "blue") == 0)) {
 		msg.action = LED_ACTION_BLUE;
-		printk("Zbus publishing: LED BLUE\n");
 		snprintk(response_buffer, sizeof(response_buffer), "LED turned blue via Zbus");
 	} else {
 		valid_action = false;
-		printk("Invalid action. Use: on, off, toggle, red, green, or blue\n");
+		// printk("Invalid action. Use: on, off, toggle, red, green, or blue\n");
 		snprintk(response_buffer, sizeof(response_buffer),
 				"Invalid action. Use: on, off, toggle, red, green, or blue");
 	}
@@ -216,7 +154,7 @@ static int led_control_tool_callback(enum mcp_tool_event_type event,
 	if (valid_action) {
 		int pub_rc = zbus_chan_pub(&led_chan, &msg, K_MSEC(200));
 		if (pub_rc != 0) {
-			printk("Zbus publish failed with error %d\n", pub_rc);
+			// printk("Zbus publish failed with error %d\n", pub_rc);
 			snprintk(response_buffer, sizeof(response_buffer),
 				 "Zbus publish failed: %d", pub_rc);
 		}
@@ -228,41 +166,11 @@ static int led_control_tool_callback(enum mcp_tool_event_type event,
 		.length = strlen(response_buffer)
 	};
 
-	printk("LED control tool executed with arguments: %s, token: %s\n",
-		arguments ? arguments : "none", execution_token);
 	mcp_server_submit_tool_message(server, &response, execution_token);
 	return ret;
 }
 
 /* Tool definitions */
-static const struct mcp_tool_record delayed_response_tool = {
-	.metadata = {
-			.name = "delayed_response",
-			.input_schema =
-			"{"
-			"\"type\":\"object\","
-			"\"properties\":{"
-				"\"message\":{"
-					"\"type\":\"string\","
-					"\"description\":\"The message to display\""
-				"}"
-			"},"
-			"\"required\":[]"
-			"}",
-#ifdef CONFIG_MCP_TOOL_DESC
-			.description = "Sends a hello message after 12000 ms.",
-#endif
-#ifdef CONFIG_MCP_TOOL_TITLE
-			.title = "Delayed Response Tool",
-#endif
-#ifdef CONFIG_MCP_TOOL_OUTPUT_SCHEMA
-			.output_schema = "{\"type\":\"object\",\"properties\":{\"response\":{"
-					 "\"type\":\"string\"}}}",
-#endif
-		},
-	.callback = delayed_response_tool_callback
-};
-
 static const struct mcp_tool_record led_control_tool = {
 	.metadata = {
 			.name = "led_control",
@@ -292,66 +200,58 @@ static const struct mcp_tool_record led_control_tool = {
 	.callback = led_control_tool_callback
 };
 
+/* MCP server is called once, after device initialization */
 int mcp_server(void)
 {
 	int ret;
 
-	printk("Initializing MCP Server...\n");
-	led_initialized = false;
+	/* Check if LED device is ready */
+	struct led_ready_msg ready_msg = {0};
+	ret = zbus_chan_read(&led_ready_chan, &ready_msg, K_MSEC(500));
+	if (ret == 0 && ready_msg.is_ready) {
+		led_initialized = true;
+		LOG_INF("LED device is ready (checked via Zbus channel)");
+	} else {
+		led_initialized = false;
+		LOG_ERR("LED device is not ready via Zbus channel (read err %d, msg status %d)",
+		       ret, ready_msg.status);
+	}
 
-	// if (gpio_is_ready_dt(&led)) {
-	// 	ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
-	// 	if (ret < 0) {
-	// 		printk("LED GPIO configuration failed: %d\n", ret);
-	// 	} else {
-			led_initialized = true;
-	// 		printk("LED initialized successfully\n");
-	// 	}
-	// } else {
-	// 	printk("LED GPIO not ready\n");
-	// }
-
+	/* Initialize MCP server */
 	server = mcp_server_init();
 	if (server == NULL) {
-		printk("MCP Server initialization failed");
+		LOG_ERR("MCP Server initialization failed");
 		return -ENOMEM;
 	}
 
+	/* Initialize HTTP server */
 	ret = mcp_server_http_init(server);
 	if (ret != 0) {
-		printk("MCP HTTP Server initialization failed: %d\n", ret);
+		LOG_ERR("MCP HTTP Server initialization failed: %d", ret);
 		return ret;
 	}
 
-	printk("Registering Tool #1: Delayed response...\n");
-	ret = mcp_server_add_tool(server, &delayed_response_tool);
-	if (ret != 0) {
-		printk("Tool #1 registration failed.\n");
-		return ret;
-	}
-	printk("Tool #1 registered.\n");
-
-	printk("Registering Tool #2: LED Control...\n");
+	LOG_INF("Registering Tool #1: LED Control...");
 	ret = mcp_server_add_tool(server, &led_control_tool);
 	if (ret != 0) {
-		printk("Tool #2 registration failed.\n");
+		LOG_ERR("Tool #1 registration failed.");
 		return ret;
 	}
-	printk("Tool #2 registered.\n");
+	// LOG_INF("Tool #1 registered.");
 
-	printk("Starting...\n");
+	LOG_INF("Starting...");
 	ret = mcp_server_start(server);
 	if (ret != 0) {
-		printk("MCP Server start failed: %d\n", ret);
+		LOG_ERR("MCP Server start failed: %d", ret);
 		return ret;
 	}
 
 	ret = mcp_server_http_start(server);
 	if (ret != 0) {
-		printk("MCP HTTP Server start failed: %d\n", ret);
+		LOG_ERR("MCP HTTP Server start failed: %d", ret);
 		return ret;
 	}
 
-	printk("MCP Server running...\n");
+	LOG_INF("MCP Server running...");
 	return 0;
 }

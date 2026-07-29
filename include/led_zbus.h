@@ -21,6 +21,12 @@ struct led_msg {
 	enum led_action action;
 };
 
+struct led_ready_msg {
+	bool is_ready;
+	int status;
+};
+
 ZBUS_CHAN_DECLARE(led_chan);
+ZBUS_CHAN_DECLARE(led_ready_chan);
 
 #endif /* LED_ZBUS_H */
