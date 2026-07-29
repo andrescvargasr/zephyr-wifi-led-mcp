@@ -150,6 +150,19 @@ Launch the serial monitor to view system logs and interact with the Zephyr shell
    # Serial-to-USB port on Linux (ESP32-C5)
    west espressif monitor -p /dev/ttyUSB0
 
+Flash and Open Serial Monitor
+=============================
+
+Flash firmware and immediately launch the serial monitor in a single command:
+
+.. code-block:: console
+
+   # Serial-to-USB port on Linux (ESP32-C5)
+   west flash --esp-device /dev/ttyUSB0 && west espressif monitor -p /dev/ttyUSB0
+
+   # USB native port on Linux (ESP32-C5)
+   west flash --esp-device /dev/ttyACM0 && west espressif monitor -p /dev/ttyACM0
+
 Sample Console Interaction
 ==========================
 
