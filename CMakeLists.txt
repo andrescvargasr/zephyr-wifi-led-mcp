@@ -10,6 +10,8 @@ list(APPEND SNIPPET
 )
 set(SNIPPET "${SNIPPET}" CACHE STRING "Default snippets")
 
+set(CONFIG_BUILD_OUTPUT_META y CACHE STRING "Enable build output metadata for SPDX")
+
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(zephyr-wifi-led-mcp)
 
