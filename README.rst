@@ -1,78 +1,68 @@
 .. zephyr:code:: wifi-led-mcp
    :name: Wi-Fi LED MCP Controller
-   :relevant-api: net_stats, mcp
+   :relevant-api: net_mgmt, wifi_mgmt, mcp, zbus
 
-   Test MCP controller for Wi-Fi, LEDs, and other hardware using the MCP Controller module.
-
-Zephyr RTOS: ``https://zephyrproject.org/``
+   This code sample demonstrates how to control a WS2812 RGB LED strip via a native Model Context Protocol (MCP) HTTP server and embedded web dashboard on Zephyr RTOS.
 
 Overview
 ********
 
-An advanced, edge-AI-compatible firmware built on **Zephyr RTOS**. This project bridges local hardware with modern AI agents by hosting a native **Model Context Protocol (MCP)** server alongside a traditional web dashboard. 
+An advanced, edge-AI-compatible firmware built on **Zephyr RTOS**. This project bridges local hardware with modern AI agents by hosting a native **Model Context Protocol (MCP)** server alongside a traditional web dashboard.
 
 With this setup, you can control a physical RGB LED through a standard browser UI *or* let an LLM agent dynamically adjust the hardware using standardized tool-calling over a local network.
 
 It includes:
 
-- Multi-threading support via ``_start_threads.c``,
-featuring a dedicated WS2812 LED strip RGB/HSV thread (``thd_led.c``) using I2S/DMA.
+- Multi-threading support via ``_start_threads.c``, featuring a dedicated WS2812 LED strip RGB/HSV thread (``thd_led.c``) using I2S/DMA.
+- Integration of a Model Context Protocol (MCP) HTTP server (``src/mcp_server.c``) listening on port 8080 (endpoint ``/mcp``) to expose remote AI tools over HTTP and interact with system hardware via Zbus message channels (``include/led_zbus.h``).
 
-It also integrates a Model Context Protocol (MCP) HTTP server (``src/mcp_server.c``)
-listening on port 8080 (endpoint ``/mcp``) to expose remote AI tools over HTTP and interact
-with system hardware via Zbus message channels (``include/led_zbus.h``).
+Key Features
+============
 
-🛠️ Key Features
-********
+* **⚡ Real-Time Control (Zephyr RTOS):** Multithreaded execution ensuring low-latency hardware control and network handling.
+* **🤖 Model Context Protocol (MCP) Server:** Exposes a JSON-RPC over HTTP/SSE interface, allowing AI agents (like Claude Desktop) to discover and call the ``set_rgb_color`` tool natively.
+* **📡 Wi-Fi & Zero-Conf (mDNS):** Automatically connects to your local network and broadcasts itself as ``mcp-led.local``—no hunting for dynamic IP addresses.
+* **🌐 Embedded Web Server:** Hosts a lightweight, responsive HTML/JS color-picker dashboard to control the LED from any web browser.
+* **💡 Hardware Abstraction:** Leverages Zephyr's Devicetree to seamlessly map to RGB LEDs across supported development boards (STM32, ESP32, Nordic, etc.).
 
-*   **⚡ Real-Time Control (Zephyr RTOS):** Multithreaded execution ensuring low-latency hardware control and network handling.
-*   **🤖 Model Context Protocol (MCP) Server:** Exposes a JSON-RPC over HTTP/SSE interface, allowing AI agents (like Claude Desktop) to discover and call the `set_rgb_color` tool natively.
-*   **📡 Wi-Fi & Zero-Conf (mDNS):** Automatically connects to your local network and broadcasts itself as `mcp-led.local`—no hunting for dynamic IP addresses.
-*   **🌐 Embedded Web Server:** Hosts a lightweight, responsive HTML/JS color-picker dashboard to control the LED from any web browser.
-*   **💡 Hardware Abstraction:** Leverages Zephyr's Devicetree to seamlessly map to RGB LEDs across supported development boards (STM32, ESP32, Nordic, etc.).
+System Architecture
+===================
 
----
+.. code-block:: text
 
-📐 System Architecture
-********
+   ┌────────────────────────┐
+   │    AI Agent / Client   │
+   └───────────┬────────────┘
+               │ (MCP Tool Call / SSE)
+               ▼
+   ┌─────────────────┐   ┌────────────────────────┐
+   │  User Browser   ├──►│ Web Server (Port 80)   │
+   └─────────────────┘   ├────────────────────────┤
+                         │  MCP Server (Port 8080)│
+                         └───────────┬────────────┘
+                                     │
+                                     ▼
+                             ┌────────────────┐
+                             │ Zephyr RTOS    │
+                             │ - MCP Service  │
+                             │ - Web Server   │
+                             │ - Wi-Fi        │
+                             │ - LED Driver   │
+                             └────────────────┘
+                                     │
+                                     ▼
+                           [ GPIO/PWM Driver Control ]
+                                    │
+                                    ▼
+                              🔴 🟢 🔵 RGB LED
 
-```
-┌────────────────────────┐
-│    AI Agent / Client   │
-└───────────┬────────────┘
-            │ (MCP Tool Call / SSE)
-            ▼
-┌─────────────────┐   ┌────────────────────────┐
-│  User Browser   ├──►│ Web Server (Port 80)   │
-└─────────────────┘   ├────────────────────────┤
-                      │  MCP Server (Port 8080)│
-                      └───────────┬────────────┘
-                                  │
-                                  ▼
-                          ┌────────────────┐
-                          │ Zephyr RTOS    │
-                          │ - MCP Service  │
-                          │ - Web Server   │
-                          │ - Wi-Fi        │
-                          │ - LED Driver   │
-                          └────────────────┘
-                                  │
-                                  ▼
-                        [ GPIO/PWM Driver Control ]
-                                 │
-                                 ▼
-                           🔴 🟢 🔵 RGB LED
-```
+MCP Server Interface
+====================
 
----
+The application features an HTTP-based MCP server running on port 8080 (endpoint ``/mcp``) with hostname ``mcp-led``. The server exposes remote tools that can be invoked by MCP clients or AI assistants:
 
-Target Boards
-=============
-
-Supported target boards include:
-
-- **ESP32-C5:** ``esp32c5_devkitc/esp32c5/hpcore`` (ESP32-C5 RISC-V High-Performance Core)
-- **Nordic nRF7002:** ``nrf7002dk/nrf5340/cpuapp``
+- **``delayed_response``**: A test tool demonstrating asynchronous execution, SSE ping keep-alives, and cancellation support.
+- **``led_control``**: Enables remote control of the WS2812 RGB LED strip over Zbus (``led_chan``). Accepts actions: ``on``, ``off``, ``toggle``, ``red``, ``green``, and ``blue``.
 
 Project Structure
 =================
@@ -89,13 +79,36 @@ Project Structure
 - ``src/thd_led.c``: WS2812 LED strip thread function implementing smooth HSV rainbow cycling and periodic logging (every 5 seconds).
 - ``src/wifi_test.c``: Wi-Fi driver, auto-connect, event management, and MCP server startup.
 
-Model Context Protocol (MCP) Server
-===================================
+Requirements
+************
 
-The application features an HTTP-based MCP server running on port 8080 (endpoint ``/mcp``) with hostname ``mcp-hello-world``. The server exposes remote tools that can be invoked by MCP clients or AI assistants:
+Hardware Requirements
+=====================
 
-- **``delayed_response``**: A test tool demonstrating asynchronous execution, SSE ping keep-alives, and cancellation support.
-- **``led_control``**: Enables remote control of the WS2812 RGB LED strip over Zbus (``led_chan``). Accepts actions: ``on``, ``off``, ``toggle``, ``red``, ``green``, and ``blue``.
+* **Supported Target Boards:**
+  - **ESP32-C5:** ``esp32c5_devkitc/esp32c5/hpcore`` (ESP32-C5 RISC-V High-Performance Core)
+  - **Nordic nRF7002:** ``nrf7002dk/nrf5340/cpuapp``
+* **Peripherals:** WS2812 RGB LED strip driven over I2S/DMA.
+* **Network:** Wi-Fi Access Point with DHCP enabled.
+
+Software & Host Environment
+===========================
+
+* **Zephyr SDK:** Version 1.0.1+ installed.
+* **Python Environment:** Python 3.x virtual environment with ``west`` installed (activated via ``zvenv`` or ``source /home/user/zephyrproject/.venv/bin/activate``).
+* **Network Services:** Host OS supporting mDNS resolution for ``http://mcp-led.local:8080/mcp``.
+
+Wiring
+******
+
+Connect the WS2812 RGB LED strip to your development board according to the Devicetree assignments specified in ``app.overlay``:
+
+* **Data Line (DIN):** Connected to the I2S/DMA data output pin defined in ``app.overlay``.
+* **Power (VCC):** +5V or +3.3V (depending on LED strip specification).
+* **Ground (GND):** Common ground with the development board.
+
+Building and Running
+********************
 
 Environment Setup
 =================
@@ -105,10 +118,7 @@ Activate the Python virtual environment before executing ``west`` commands:
 .. code-block:: console
 
    zvenv
-   # or: source /home/camilo/zephyrproject/.venv/bin/activate
-
-Building and Running
-********************
+   # or: source /home/user/zephyrproject/.venv/bin/activate
 
 Set Target Board Configuration
 ==============================
@@ -139,28 +149,27 @@ Build with Kconfig overlay (e.g. debug overlay):
    west build -b esp32c5_devkitc/esp32c5/hpcore -- -DEXTRA_CONF_FILE="overlay-debug.conf"
 
 Build with Snippets
-=====================
+===================
 
 You can enable and test various snippets incrementally:
 
-1. **Add `wifi-credentials` and test it:**
+1. **Add ``wifi-credentials`` and test it:**
 
    .. code-block:: console
 
       west build -p -S wifi-credentials
 
-2. **Add `espressif-psram-8M` and test it:**
+2. **Add ``espressif-psram-8M`` and test it:**
 
    .. code-block:: console
 
       west build -p -S wifi-credentials -S espressif-psram-8M
 
-3. **Add `espressif-psram-wifi` and test it:**
+3. **Add ``espressif-psram-wifi`` and test it:**
 
    .. code-block:: console
 
       west build -p -S wifi-credentials -S espressif-psram-8M -S espressif-psram-wifi
-
 
 Flashing to Hardware
 ====================
@@ -243,17 +252,17 @@ Connection Requirements
 1. **Host Environment:**
    * Python 3.x (uses built-in ``urllib.request`` and ``json`` libraries).
    * The host machine running the script must be on the same Wi-Fi / LAN network as the target board.
-   * Host OS must support mDNS to resolve ``http://mcp-hello-world.local:8080/mcp``. If mDNS is disabled, replace the hostname with the board's IPv4 address.
+   * Host OS must support mDNS to resolve ``http://mcp-led.local:8080/mcp``. If mDNS is disabled, replace the hostname with the board's IPv4 address.
 
 2. **Target Device Configuration:**
    * Active Wi-Fi network connection with an assigned IPv4 address via DHCP.
-   * mDNS Responder enabled (``CONFIG_MDNS_RESPONDER=y``, ``CONFIG_NET_HOSTNAME="mcp-hello-world"``).
+   * mDNS Responder enabled (``CONFIG_MDNS_RESPONDER=y``, ``CONFIG_NET_HOSTNAME="mcp-led"``).
    * MCP HTTP Server configured on port 8080 at endpoint ``/mcp`` (``CONFIG_MCP_SERVER=y``, ``CONFIG_MCP_HTTP_PORT=8080``, ``CONFIG_MCP_HTTP_ENDPOINT="/mcp"``).
    * Active Zbus subscriber channel ``led_chan`` and LED strip thread (``thd_led.c``).
 
 3. **MCP JSON-RPC 2.0 Handshake Flow:**
 
-   To establish a successful connection, the server must support the 3-step MCP sequence executed by ``control_led.py``:
+   To establish a successful connection, the server must support the 3-step MCP sequence (JSON-RPC 2.0, version 2025-11-25) executed by ``control_led.py``:
 
    * **Step 1: Session Initialization (initialize)**
 
@@ -339,4 +348,10 @@ Running the Script
    python control_led.py green
    python control_led.py blue
 
+References
+**********
 
+* `Zephyr RTOS Documentation <https://docs.zephyrproject.org/>`_
+* `Zephyr Wi-Fi Management Subsystem <https://docs.zephyrproject.org/latest/connectivity/networking/api/wifi.html>`_
+* `Model Context Protocol (MCP) Specification <https://modelcontextprotocol.io/>`_
+* `Zephyr Zbus IPC Subsystem <https://docs.zephyrproject.org/latest/services/zbus/index.html>`_
