@@ -1,23 +1,70 @@
-.. zephyr:code-sample:: wifi-shell
-   :name: Wi-Fi shell
-   :relevant-api: net_stats
+.. zephyr:code:: wifi-led-mcp
+   :name: Wi-Fi LED MCP Controller
+   :relevant-api: net_stats, mcp
 
-   Test Wi-Fi functionality using the Wi-Fi shell module.
+   Test MCP controller for Wi-Fi, LEDs, and other hardware using the MCP Controller module.
+
+Zephyr RTOS: ``https://zephyrproject.org/``
 
 Overview
 ********
 
-This sample allows testing Wi-Fi drivers for various boards by
-enabling the Wi-Fi shell module that provides a set of commands:
-scan, connect, and disconnect. It also enables the net_shell module
-to verify net_if settings.
+An advanced, edge-AI-compatible firmware built on **Zephyr RTOS**. This project bridges local hardware with modern AI agents by hosting a native **Model Context Protocol (MCP)** server alongside a traditional web dashboard. 
 
-Additionally, it includes multi-threading support via ``_start_threads.c``,
+With this setup, you can control a physical RGB LED through a standard browser UI *or* let an LLM agent dynamically adjust the hardware using standardized tool-calling over a local network.
+
+It includes:
+
+- Multi-threading support via ``_start_threads.c``,
 featuring a dedicated WS2812 LED strip RGB/HSV thread (``thd_led.c``) using I2S/DMA.
 
 It also integrates a Model Context Protocol (MCP) HTTP server (``src/mcp_server.c``)
 listening on port 8080 (endpoint ``/mcp``) to expose remote AI tools over HTTP and interact
 with system hardware via Zbus message channels (``include/led_zbus.h``).
+
+🛠️ Key Features
+********
+
+*   **⚡ Real-Time Control (Zephyr RTOS):** Multithreaded execution ensuring low-latency hardware control and network handling.
+*   **🤖 Model Context Protocol (MCP) Server:** Exposes a JSON-RPC over HTTP/SSE interface, allowing AI agents (like Claude Desktop) to discover and call the `set_rgb_color` tool natively.
+*   **📡 Wi-Fi & Zero-Conf (mDNS):** Automatically connects to your local network and broadcasts itself as `mcp-led.local`—no hunting for dynamic IP addresses.
+*   **🌐 Embedded Web Server:** Hosts a lightweight, responsive HTML/JS color-picker dashboard to control the LED from any web browser.
+*   **💡 Hardware Abstraction:** Leverages Zephyr's Devicetree to seamlessly map to RGB LEDs across supported development boards (STM32, ESP32, Nordic, etc.).
+
+---
+
+📐 System Architecture
+********
+
+```
+┌────────────────────────┐
+│    AI Agent / Client   │
+└───────────┬────────────┘
+            │ (MCP Tool Call / SSE)
+            ▼
+┌─────────────────┐   ┌────────────────────────┐
+│  User Browser   ├──►│ Web Server (Port 80)   │
+└─────────────────┘   ├────────────────────────┤
+                      │  MCP Server (Port 8080)│
+                      └───────────┬────────────┘
+                                  │
+                                  ▼
+                          ┌────────────────┐
+                          │ Zephyr RTOS    │
+                          │ - MCP Service  │
+                          │ - Web Server   │
+                          │ - Wi-Fi        │
+                          │ - LED Driver   │
+                          └────────────────┘
+                                  │
+                                  ▼
+                        [ GPIO/PWM Driver Control ]
+                                 │
+                                 ▼
+                           🔴 🟢 🔵 RGB LED
+```
+
+---
 
 Target Boards
 =============
@@ -188,7 +235,7 @@ Sample Console Interaction
 Testing MCP Client with Python
 ==============================
 
-A Python test script is available in ``/home/camilo/zephyrproject/projects/test_mcp_python_code/control_led.py`` to test the connection and issue remote commands to the MCP HTTP server.
+A Python test script is available in ``/home/user/zephyrproject/projects/test_mcp_python_code/control_led.py`` to test the connection and issue remote commands to the MCP HTTP server.
 
 Connection Requirements
 -----------------------
