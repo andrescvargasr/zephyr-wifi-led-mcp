@@ -1,7 +1,15 @@
-/*
- * Copyright 2025 NXP
+/**
+ * Copyright (c) 2026 Andrés Camilo Román Vargas
  *
- * SPDX-License-Identifier: Apache-2.0
+ * @file mcp_server.c
+ * @author Andres C. Román V. (camilo.vargas@technaid.com gh: @andrescvargasr)
+ * @brief
+ * @version 1.0
+ * @date 2026-07-24
+ *
+ * MCP Server implementation.
+ *
+ * SPDX-License-Identifier: MIT
  */
 
 #include <zephyr/kernel.h>

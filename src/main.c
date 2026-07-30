@@ -1,7 +1,15 @@
-/*
- * Copyright (c) 2024 Zephyr Project
+/**
+ * Copyright (c) 2026 Andres Camilo Román Vargas
  *
- * SPDX-License-Identifier: Apache-2.0
+ * @file main.c
+ * @author Andres C. Román V. (camilo.vargas@technaid.com gh: @andrescvargasr)
+ * @brief
+ * @version 1.0
+ * @date 2026-07-24
+ *
+ * Main application entry point for MCP, LED, and Wi-Fi interfaces.
+ *
+ * SPDX-License-Identifier: MIT
  */
 
 #include <zephyr/kernel.h>

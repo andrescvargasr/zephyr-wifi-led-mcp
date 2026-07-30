@@ -1,13 +1,13 @@
 /**
+ * Copyright (c) 2026 Andrés Camilo Román Vargas
+ *
  * @file params.h
- * @author Andres C. Vargas R. (camilo.vargas@technaid.com gh: @andrescvargasr)
+ * @author Andres C. Román V. (camilo.vargas@technaid.com gh: @andrescvargasr)
  * @brief Call the libraries, constants and parameters for all the code.
  * @version 0.1
- * @date 2024-07-22
+ * @date 2026-07-28
  *
- *
- * TODO:
- * [] Ramp control on DAC.
+ * SPDX-License-Identifier: MIT
  */
 
 #ifndef PARAMS_H

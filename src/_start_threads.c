@@ -1,12 +1,14 @@
 /**
  * Copyright (c) 2026 Andrés Camilo Román Vargas
+ *
  * @file _start_threads.c
- * @author Andres C. Vargas R. (camilo.vargas@technaid.com gh: @andrescvargasr)
+ * @author Andres C. Román V. (camilo.vargas@technaid.com gh: @andrescvargasr)
  * @brief
- * @version 0.1
- * @date 2024-07-24
+ * @version 1.0
+ * @date 2026-07-24
  *
  * Define and initialize the Threads and Workqueues for the project.
+ *
  * SPDX-License-Identifier: MIT
  */
 

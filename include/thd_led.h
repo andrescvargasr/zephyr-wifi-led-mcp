@@ -1,12 +1,15 @@
 /**
+ * Copyright (c) 2026 Andrés Camilo Román Vargas
+ *
  * @file thd_led.h
- * @author Andres C. Vargas R. (camilo.vargas@technaid.com gh: @andrescvargasr)
- * @brief
+ * @author Andres C. Román V. (camilo.vargas@technaid.com gh: @andrescvargasr)
+ * @brief Thread for LED control and rainbow animation.
  * @version 0.1
  * @date 2026-07-24
  *
- *
+ * SPDX-License-Identifier: MIT
  */
+
 #ifndef THD_LED_H
 #define THD_LED_H
 

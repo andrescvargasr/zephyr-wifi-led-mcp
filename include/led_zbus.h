@@ -1,6 +1,13 @@
 /**
+ * Copyright (c) 2026 Andrés Camilo Román Vargas
+ *
  * @file led_zbus.h
+ * @author Andres C. Román V. (camilo.vargas@technaid.com gh: @andrescvargasr)
  * @brief Zbus channels and messages for LED strip control.
+ * @version 0.1
+ * @date 2026-07-28
+ *
+ * SPDX-License-Identifier: MIT
  */
 
 #ifndef LED_ZBUS_H
