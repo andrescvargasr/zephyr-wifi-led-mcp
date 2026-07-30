@@ -171,6 +171,17 @@ You can enable and test various snippets incrementally:
 
       west build -p -S wifi-credentials -S espressif-psram-8M -S espressif-psram-wifi
 
+Generating SPDX Bill of Materials (SBOM)
+========================================
+
+To generate Software Bill of Materials (SPDX 2.3) documents for your build (`DCONFIG_BUILD_OUTPUT_META` in enable by defualt):
+
+.. code-block:: console
+
+   west spdx --init -d build
+   west build -d build -- -DCONFIG_BUILD_OUTPUT_META=y
+   west spdx -d build
+
 Flashing to Hardware
 ====================
 

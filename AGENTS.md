@@ -1,15 +1,15 @@
 # AGENTS.md - Zephyr RTOS Project Guidelines & Context
 
-This file provides workspace context, build instructions, and development guidelines for AI coding agents working on the **wifi-shell** Zephyr RTOS project.
+This file provides workspace context, build instructions, and development guidelines for AI coding agents working on the **zephyr-wifi-led-mcp** Zephyr RTOS project.
 
 ---
 
 ## 1. Project Overview
 
-- **Project Name:** `wifi-shell`
-- **Path:** `/home/camilo/zephyrproject/projects/wifi-shell`
-- **RTOS:** Zephyr RTOS (v4.4.99+, located at `/home/camilo/zephyrproject/zephyr`)
-- **Primary Purpose:** Test Wi-Fi driver functionality, Wi-Fi shell commands (`wifi scan`, `wifi connect`, `wifi disconnect`), network stack management (`net_shell`, `net_if`), PSRAM allocation/relocation, auto-connection with stored Wi-Fi credentials upon boot, and HTTP Model Context Protocol (MCP) server tool execution with Zbus hardware control integration.
+- **Project Name:** `zephyr-wifi-led-mcp`
+- **Path:** `/home/user/zephyrproject/projects/zephyr-wifi-led-mcp`
+- **RTOS:** Zephyr RTOS (v4.4.99+, located at `/home/user/zephyrproject/zephyr`)
+- **Primary Purpose:** Test Wi-Fi driver functionality, Wi-Fi shell commands (`wifi scan`, `wifi connect`, `wifi disconnect`), network stack management (`net_shell`, `net_if`), PSRAM allocation/relocation, auto-connection with stored Wi-Fi credentials upon boot, HTTP Model Context Protocol (MCP) server tool execution, and Zbus hardware control integration.
 - **Target Board / Architecture:** Default configured board is `esp32c5_devkitc/esp32c5/hpcore` (ESP32-C5 RISC-V High-Performance Core). Can also target Nordic `nrf7002dk/nrf5340/cpuapp` or other supported Wi-Fi boards.
 
 ---
@@ -18,26 +18,26 @@ This file provides workspace context, build instructions, and development guidel
 
 ### Python Virtual Environment
 The Zephyr environment relies on a dedicated Python virtual environment:
-- **Location:** `/home/camilo/zephyrproject/.venv`
-- **Activation Command:** `source /home/camilo/zephyrproject/.venv/bin/activate` (or `zvenv` alias)
-- **SDK:** Zephyr SDK 1.0.1 installed at `/home/camilo/zephyr-sdk-1.0.1`
+- **Location:** `/home/user/zephyrproject/.venv`
+- **Activation Command:** `source /home/user/zephyrproject/.venv/bin/activate` (or `zvenv` alias)
+- **SDK:** Zephyr SDK 1.0.1 installed at `/home/user/zephyr-sdk-1.0.1`
 
-> **Note for Agents:** Always ensure commands interacting with `west` or Python tools run with `zvenv` activated or within the virtual environment PATH (`/home/camilo/zephyrproject/.venv/bin`).
+> **Note for Agents:** Always ensure commands interacting with `west` or Python tools run with `zvenv` activated or within the virtual environment PATH (`/home/user/zephyrproject/.venv/bin`).
 
 ---
 
 ## 3. Project Structure & Features
 
 ```
-zephyr-wifi/
+zephyr-wifi-led-mcp/
 ├── .gitignore                  # Git ignore rules for build artifacts and temporary files
-├── CMakeLists.txt              # CMake build script (appends default snippets and includes include/)
+├── CMakeLists.txt              # CMake build script (appends default snippets, sets CONFIG_BUILD_OUTPUT_META=y, and includes include/)
 ├── Kconfig                     # Application Kconfig options (LED brightness, update delay)
 ├── VERSION                     # Project version file
 ├── app.overlay                 # Devicetree overlay for WS2812 LED strip (I2S/DMA)
 ├── prj.conf                    # Main Kconfig application configuration
 ├── overlay-debug.conf          # Debug Kconfig overlay configuration
-├── README.rst                  # Documentation, snippet testing guide, and sample logs
+├── README.rst                  # Documentation, snippet testing guide, SPDX generation, and sample logs
 ├── tests.yaml                  # Twister test configuration for automated test runs
 ├── esp32/
 │   └── overlay_enterprise.conf # Kconfig overlay for ESP32 WPA Enterprise features
@@ -48,17 +48,17 @@ zephyr-wifi/
 │   └── thd_led.h               # Header file declaring LED strip thread functions
 ├── src/
 │   ├── _start_threads.c        # Thread initialization boilerplate (defines thd_led thread)
+│   ├── main.c                  # Main application entry point, Wi-Fi auto-connect, DHCP management, and MCP startup
 │   ├── mcp_server.c            # MCP HTTP server initialization, tool callbacks, and Zbus publishing
-│   ├── thd_led.c               # LED strip HSV thread function with 5-second periodic logging
-│   └── wifi_test.c             # Wi-Fi test module, auto-connect, event management, and MCP initialization
+│   └── thd_led.c               # LED strip HSV thread function with 5-second periodic logging
 └── build/                      # Generated build artifacts (managed by west)
 ```
 
 ### Application Features & Threads
 - **LED Strip Thread (`src/thd_led.c`):** Runs the WS2812 RGB LED strip driven over I2S/DMA via `app.overlay`. Animates HSV rainbow colors and logs status every 5 seconds.
 - **Thread Management (`src/_start_threads.c`):** Boilerplate defining system threads (e.g. `thd_led`) using `K_THREAD_DEFINE`.
-- **Wi-Fi Module (`src/wifi_test.c`):** Handles Wi-Fi status callbacks, DHCP event notifications, auto-connection using saved credentials in NVS, and launches the MCP server.
-- **MCP HTTP Server & Zbus (`src/mcp_server.c`, `include/mcp_server.h`, `include/led_zbus.h`):** Runs an HTTP MCP server listening on port 8080 (`/mcp` endpoint) under hostname `mcp-hello-world`. Registers MCP tools:
+- **Main Application Module (`src/main.c`):** Handles Wi-Fi status callbacks, DHCP event notifications, auto-connection using saved credentials in NVS, and launches the MCP server.
+- **MCP HTTP Server & Zbus (`src/mcp_server.c`, `include/mcp_server.h`, `include/led_zbus.h`):** Runs an HTTP MCP server listening on port 8080 (`/mcp` endpoint) under hostname `mcp-led`. Registers MCP tools:
   - `delayed_response`: Asynchronous tool for SSE ping keep-alive and cancellation testing.
   - `led_control`: Remote LED command tool publishing to Zbus channel `led_chan` (`on`, `off`, `toggle`, `red`, `green`, `blue`).
 - **PSRAM Size Output:** Queries and prints detected PSRAM size on startup using `esp_psram_get_size()` or Devicetree properties.
@@ -68,13 +68,14 @@ zephyr-wifi/
 `CMakeLists.txt` appends default snippets to `SNIPPET` prior to `find_package(Zephyr)`:
 - `wifi-credentials`
 - `espressif-psram-8M`
+- `espressif-psram-reloc`
 - `espressif-psram-wifi`
 
 ---
 
 ## 4. Common Build & Flashing Commands
 
-All commands should be executed from the project root (`/home/camilo/zephyrproject/projects/wifi-shell`):
+All commands should be executed from the project root (`/home/user/zephyrproject/projects/zephyr-wifi-led-mcp`):
 
 ### Set Target Board
 ```bash
@@ -90,10 +91,18 @@ west build
 west build -p always -b esp32c5_devkitc/esp32c5/hpcore
 
 # Build with custom/additional snippets
-west build -p -S wifi-credentials -S espressif-psram-8M -S espressif-psram-wifi
+west build -p -S wifi-credentials -S espressif-psram-8M -S espressif-psram-reloc -S espressif-psram-wifi
 
 # Build with specific Kconfig overlay (e.g. debug or ESP32 enterprise)
 west build -b esp32c5_devkitc/esp32c5/hpcore -- -DEXTRA_CONF_FILE="overlay-debug.conf"
+```
+
+### SPDX Bill of Materials (SBOM) Generation
+```bash
+# Initialize and generate SPDX 2.3 documents
+west spdx --init -d build
+west build -d build -- -DCONFIG_BUILD_OUTPUT_META=y
+west spdx -d build
 ```
 
 ### Flash to Hardware
@@ -125,8 +134,9 @@ west twister -T .
 
 ## 5. Coding & Development Guidelines
 
-### C Coding Style (Zephyr Standard)
+### C Coding Style & SPDX Metadata (Zephyr Standard)
 - Follow standard Zephyr / Linux Kernel C style guidelines:
+  - **License Headers:** Include standard SPDX tag (`SPDX-License-Identifier: MIT` or `Apache-2.0`), Doxygen `@file`, `@author`, `@version`, and `@date` tags in all `.c` and `.h` files.
   - **Tabs:** 8-character tab indentations.
   - **Naming:** `snake_case` for function and variable names; `UPPER_CASE` for macros and Kconfig options.
   - **Types:** Use exact-width types (`uint8_t`, `uint32_t`, `ssize_t`, `bool`) from `<zephyr/types.h>` or standard C headers.
@@ -142,10 +152,11 @@ west twister -T .
   - `CONFIG_NET_MGMT_EVENT_QUEUE_SIZE` / `CONFIG_NET_MGMT_EVENT_QUEUE_TIMEOUT` - Tuned for Wi-Fi scan results processing without queue overflows.
   - `CONFIG_MCP_SERVER=y` - Enable Model Context Protocol (MCP) server library.
   - `CONFIG_MCP_HTTP_PORT=8080` / `CONFIG_MCP_HTTP_ENDPOINT="/mcp"` - MCP HTTP server port and endpoint.
+  - `CONFIG_MDNS_RESPONDER=y` / `CONFIG_NET_HOSTNAME="mcp-led"` - Zero-conf mDNS hostname resolution.
   - `CONFIG_MCP_MAX_TOOLS=4` / `CONFIG_MCP_REQUEST_WORKERS=2` - MCP tool capacity and worker thread allocations.
 
 ### Devicetree (`.dts` / `.overlay`)
-- If hardware pin assignments or peripheral nodes need customization, add a board overlay file in `boards/<board_name>.overlay`.
+- Hardware pin assignments or peripheral nodes are customized in `app.overlay` or board overlays in `boards/<board_name>.overlay`.
 
 ### Verification Requirement
 - Before completing any task, always verify that the project compiles cleanly using `west build` inside `zvenv`.
