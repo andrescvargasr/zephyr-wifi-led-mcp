@@ -244,7 +244,7 @@ Sample Console Interaction
 Testing MCP Client with Python
 ==============================
 
-A Python test script is available in ``/home/user/zephyrproject/projects/test_mcp_python_code/control_led.py`` to test the connection and issue remote commands to the MCP HTTP server.
+A Python test script is available in `test_mcp_python_code <https://github.com/andrescvargasr/test_mcp_python_code>`_ to test the connection and issue remote commands to the MCP HTTP server.
 
 Connection Requirements
 -----------------------
