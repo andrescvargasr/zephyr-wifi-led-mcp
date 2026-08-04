@@ -15,15 +15,16 @@
 // Parameters
 #include "params.h"
 
-// Threads
-#ifdef THD_LED
-#include "thd_led.h"
-#endif // THD_LED
+// Move to main.c for PSRAM allocation
+// // Threads
+// #ifdef THD_LED
+// #include "thd_led.h"
+// #endif // THD_LED
 
 #define THD_STACKSIZE 512 // Should always be a power of two.
-#define THREAD_LED_PRIORITY K_PRIO_PREEMPT(2)
+// #define THREAD_LED_PRIORITY K_PRIO_PREEMPT(2)
 
-#define DELAY_THD 10 // ms
+// #define DELAY_THD 10 // ms
 
 /******************************************************************************/
 /*                          Zephyr Workqueue Table	                          */
@@ -40,7 +41,15 @@
 /******************************************************************************/
 /*                          Zephyr Multithreading Table                       */
 /******************************************************************************/
+// #define THD_LED_STACKSIZE THD_STACKSIZE
+// static Z_KERNEL_STACK_DEFINE_IN(thd_led_stack, THD_LED_STACKSIZE, __attribute__((section(".ext_ram.bss"))));
+
 #ifdef THD_LED
-K_THREAD_DEFINE(thd_led, THD_STACKSIZE, thread_led, NULL, NULL, NULL,
-				THREAD_LED_PRIORITY, 0, (0 * DELAY_THD));
+
+/*
+ * Thread LED Definition was moved to main file to use PSRAM
+*/
+
+// K_THREAD_DEFINE(thd_led, THD_LED_STACKSIZE, thread_led, NULL, NULL, NULL,
+// 				THREAD_LED_PRIORITY, 0, (0 * DELAY_THD));
 #endif // End THD_LED
