@@ -121,42 +121,6 @@ int auto_connect(void)
 	return ret;
 }
 
-int test_psram(void)
-{
-	uint32_t *p_mem, k;
-
-	LOG_INF("Sample PSRAM test started");
-
-	p_mem = shared_multi_heap_aligned_alloc(SMH_REG_ATTR_EXTERNAL, 32, 1024 * sizeof(uint32_t));
-
-	if (p_mem == NULL) {
-		LOG_ERR("PSRAM memory allocation failed!");
-		return -ENOMEM;
-	}
-
-	for (k = 0; k < 1024; k++) {
-		p_mem[k] = k;
-	}
-
-	for (k = 0; k < 1024; k++) {
-		if (p_mem[k] != k) {
-			LOG_ERR("p_mem[%"PRIu32"]: %"PRIu32" (expected value %"PRIu32")", k, p_mem[k], k);
-			return -EIO;
-		}
-	}
-
-	shared_multi_heap_free(p_mem);
-
-	if (k < 1024) {
-		LOG_ERR("Failed checking memory contents.");
-		return -1;
-	}
-
-	LOG_INF("Sample PSRAM test finished successfully!");
-
-	return 0;
-}
-
 int main(void)
 {
 #if defined(CONFIG_ESP_SPIRAM)
@@ -168,20 +132,18 @@ int main(void)
 		printk("PSRAM is not initialized\n");
 	}
 
-	// Run PSRAM test only for the HP core
-	test_psram();
 #elif DT_NODE_EXISTS(DT_NODELABEL(psram0))
 	printk("PSRAM size: %u bytes (%u MB)\n",
 	       DT_PROP(DT_NODELABEL(psram0), size),
 	       DT_PROP(DT_NODELABEL(psram0), size) / (1024 * 1024));
 	
-	// Run PSRAM test only for the HP core
-	test_psram();
 #else
 	LOG_WRN("PSRAM not available");
 #endif
 
-// Stating Threads
+/*******************************************************************************
+ *  THREADS INITIALIZATION                                                     *
+ ******************************************************************************/
 #ifdef THD_LED
 	k_tid_t my_tid = k_thread_create(&thd_led_data, thd_led_stack,
 									K_THREAD_STACK_SIZEOF(thd_led_stack),
@@ -190,7 +152,7 @@ int main(void)
 									THD_LED_PRIORITY, 0, K_MSEC(0 * THD_LED_DELAY_MS));
 #endif // End THD_LED
 
-	LOG_INF("Starting Wi-Fi Shell application...");
+	LOG_INF("Starting Wi-Fi MCP Server application...");
 
 	k_sem_init(&wifi_connected_sem, 0, 1);
 
