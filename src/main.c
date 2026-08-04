@@ -31,7 +31,10 @@
 
 LOG_MODULE_REGISTER(wifi_test, LOG_LEVEL_INF);
 
-static struct k_sem wifi_connected_sem;
+__attribute__ ((section (".ext_ram.bss"))) static struct k_sem wifi_connected_sem;
+
+__attribute__ ((section (".ext_ram.bss"))) static struct net_mgmt_event_callback wifi_mgmt_cb;
+__attribute__ ((section (".ext_ram.bss"))) static struct net_mgmt_event_callback dhcp_mgmt_cb;
 
 static struct net_mgmt_event_callback wifi_mgmt_cb;
 static struct net_mgmt_event_callback dhcp_mgmt_cb;

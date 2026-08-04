@@ -38,7 +38,7 @@ LOG_MODULE_REGISTER(led_rgb);
 
 #define RGB(_r, _g, _b) { .r = (_r), .g = (_g), .b = (_b) }
 
-static struct led_rgb pixels[STRIP_NUM_PIXELS];
+__attribute__ ((section (".ext_ram.bss"))) static struct led_rgb pixels[STRIP_NUM_PIXELS];
 
 static const struct device *const strip = DEVICE_DT_GET(STRIP_NODE);
 

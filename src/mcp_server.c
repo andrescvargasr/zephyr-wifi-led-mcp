@@ -24,9 +24,9 @@ LOG_MODULE_REGISTER(mcp_app_server, LOG_LEVEL_INF);
 
 #define DELAYED_RESPONSE_TEXT "Hello from the delayed response tool!"
 
-mcp_server_ctx_t server;
+__attribute__ ((section (".ext_ram.bss"))) mcp_server_ctx_t server;
 
-static bool led_initialized;
+__attribute__ ((section (".ext_ram.bss"))) static bool led_initialized;
 
 /* Tool helper function */
 static const char *extract_json_string_value(const char *json, const char *key)

@@ -18,7 +18,7 @@
 
 #ifdef THD_LED
 // Thread
-void thread_led(void);
+void thread_led(void* p1, void* p2, void* p3);
 #endif // End THD_LED
 
 #endif // End THD_LED_H
