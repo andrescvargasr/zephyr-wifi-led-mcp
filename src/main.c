@@ -29,7 +29,22 @@
 #include <zephyr/multi_heap/shared_multi_heap.h>
 #endif
 
+// MCP Server
 #include "mcp_server.h"
+
+// HTTP Server
+#include <stdio.h>
+#include <inttypes.h>
+
+#include <zephyr/net/http/server.h>
+#include <zephyr/net/http/service.h>
+#include <zephyr/net/net_ip.h>
+#include <zephyr/net/socket.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/data/json.h>
+#include <zephyr/sys/util_macro.h>
+#include <zephyr/net/net_config.h>
+#include "web_assets.h"
 
 #include "params.h"
 
@@ -55,6 +70,57 @@ __attribute__ ((section (".ext_ram.bss"))) static struct k_sem wifi_connected_se
 
 __attribute__ ((section (".ext_ram.bss"))) static struct net_mgmt_event_callback wifi_mgmt_cb;
 __attribute__ ((section (".ext_ram.bss"))) static struct net_mgmt_event_callback dhcp_mgmt_cb;
+/* Handlers to return files with correct Content-Type and Gzip headers */
+
+// index.html
+static struct http_resource_detail_static index_html_gz_resource_detail = {
+	.common = {
+			.type = HTTP_RESOURCE_TYPE_STATIC,
+			.bitmask_of_supported_http_methods = BIT(HTTP_GET),
+			.content_encoding = "gzip",
+			.content_type = "text/html",
+		},
+	.static_data = index_html_gz,
+	// .static_data_len = sizeof(index_html_gz),
+	.static_data_len = index_html_gz_len,
+};
+
+// app.js
+static struct http_resource_detail_static app_js_gz_resource_detail = {
+	.common = {
+			.type = HTTP_RESOURCE_TYPE_STATIC,
+			.bitmask_of_supported_http_methods = BIT(HTTP_GET),
+			.content_encoding = "gzip",
+			.content_type = "text/javascript",
+		},
+	.static_data = app_js_gz,
+	// .static_data_len = app_js_gz_len,
+	.static_data_len = sizeof(app_js_gz),
+};
+
+// style.css
+static struct http_resource_detail_static style_css_gz_resource_detail = {
+	.common = {
+			.type = HTTP_RESOURCE_TYPE_STATIC,
+			.bitmask_of_supported_http_methods = BIT(HTTP_GET),
+			.content_encoding = "gzip",
+			.content_type = "text/css",
+		},
+	.static_data = style_css_gz,
+	.static_data_len = style_css_gz_len,
+};
+/* Define HTTP Service */
+static uint16_t led_http_service_port = NET_SAMPLE_HTTP_SERVER_SERVICE_PORT;
+HTTP_SERVICE_DEFINE(led_http_service, NULL, &led_http_service_port,
+		    CONFIG_HTTP_SERVER_MAX_CLIENTS, 10, NULL, NULL, NULL);
+/* Register static endpoints */
+HTTP_RESOURCE_DEFINE(index_html_gz_resource, led_http_service, "/",
+		     &index_html_gz_resource_detail);
+HTTP_RESOURCE_DEFINE(app_js_gz_resource, led_http_service, "/app.js",
+		     &app_js_gz_resource_detail);
+HTTP_RESOURCE_DEFINE(style_css_gz_resource, led_http_service, "/style.css",
+		     &style_css_gz_resource_detail);
+
 
 
 static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
@@ -176,6 +242,8 @@ int main(void)
 	mcp_server();
 
 	k_sem_give(&wifi_connected_sem);
+
+	http_server_start();
 
 	return 0;
 }

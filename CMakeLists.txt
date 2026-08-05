@@ -15,8 +15,18 @@ set(CONFIG_BUILD_OUTPUT_META y CACHE STRING "Enable build output metadata for SP
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(zephyr-wifi-led-mcp)
 
+option(INCLUDE_HTML_CONTENT "Include the HTML content" ON)
+
+target_link_libraries(app PRIVATE zephyr_interface zephyr)
+
 # Include external headers
 zephyr_include_directories(include)
+
+zephyr_linker_sources(SECTIONS sections-rom.ld)
+zephyr_linker_section_ifdef(CONFIG_NET_SAMPLE_HTTP_SERVICE
+  NAME http_resource_desc_led_http_service
+  KVMA RAM_REGION GROUP RODATA_REGION
+)
 
 FILE(GLOB app_sources src/*.c)
 target_sources(app PRIVATE ${app_sources})
