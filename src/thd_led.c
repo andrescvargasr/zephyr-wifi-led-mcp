@@ -50,7 +50,7 @@ ZBUS_CHAN_DEFINE(led_chan,
 		 NULL,
 		 NULL,
 		 ZBUS_OBSERVERS(led_sub),
-		 ZBUS_MSG_INIT(.action = LED_ACTION_ON)
+		 ZBUS_MSG_INIT(.action = LED_ACTION_ON, .r = 0, .g = 0, .b = 0, .rainbow = true)
 );
 
 ZBUS_CHAN_DEFINE(led_ready_chan,
@@ -190,6 +190,17 @@ void thread_led(void *p1, void *p2, void *p3)
 					solid_g = 0;
 					solid_b = CONFIG_SAMPLE_LED_BRIGHTNESS;
 					led_set(solid_r, solid_g, solid_b);
+					break;
+				case LED_ACTION_CUSTOM:
+					if (msg.rainbow) {
+						mode = LED_MODE_RAINBOW;
+					} else {
+						mode = LED_MODE_SOLID;
+						solid_r = msg.r;
+						solid_g = msg.g;
+						solid_b = msg.b;
+						led_set(solid_r, solid_g, solid_b);
+					}
 					break;
 				}
 			}

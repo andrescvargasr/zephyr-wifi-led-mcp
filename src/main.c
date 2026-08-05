@@ -47,6 +47,8 @@
 #include "web_assets.h"
 
 #include "params.h"
+#include <zephyr/zbus/zbus.h>
+#include "led_zbus.h"
 
 // Threads
 #ifdef THD_LED
@@ -133,7 +135,7 @@ static const char ping_response[] = "pong";
 static struct http_resource_detail_static ping_resource_detail = {
 	.common = {
 			.type = HTTP_RESOURCE_TYPE_STATIC,
-			.bitmask_of_supported_http_methods = BIT(HTTP_GET) | BIT(HTTP_HEAD),
+			.bitmask_of_supported_http_methods = BIT(HTTP_GET) | BIT(HTTP_HEAD) | BIT(HTTP_POST),
 			.content_type = "text/plain",
 		},
 	.static_data = ping_response,
@@ -155,13 +157,18 @@ static void parse_led_post(uint8_t *buf, size_t len)
 
 	LOG_DBG("POST request setting LED to state r: %d, g: %d, b: %d, rainbow: %s", cmd.r, cmd.g, cmd.b, cmd.rainbow ? "true" : "false");
 
-	// if (leds_dev != NULL) {
-	// 	if (cmd.led_state) {
-	// 		led_on(leds_dev, cmd.led_num);
-	// 	} else {
-	// 		led_off(leds_dev, cmd.led_num);
-	// 	}
-	// }
+	struct led_msg msg = {
+		.action = LED_ACTION_CUSTOM,
+		.r = (uint8_t)CLAMP(cmd.r, 0, 255),
+		.g = (uint8_t)CLAMP(cmd.g, 0, 255),
+		.b = (uint8_t)CLAMP(cmd.b, 0, 255),
+		.rainbow = cmd.rainbow
+	};
+
+	int pub_rc = zbus_chan_pub(&led_chan, &msg, K_MSEC(200));
+	if (pub_rc != 0) {
+		LOG_ERR("Failed to publish LED command to Zbus: %d", pub_rc);
+	}
 }
 
 static int led_handler(struct http_client_ctx *client, enum http_transaction_status status,
@@ -215,7 +222,7 @@ static struct http_resource_detail_dynamic led_resource_detail = {
 };
 
 /* Define HTTP Service */
-static uint16_t led_http_service_port = NET_SAMPLE_HTTP_SERVER_SERVICE_PORT;
+static uint16_t led_http_service_port = CONFIG_NET_SAMPLE_HTTP_SERVER_SERVICE_PORT;
 HTTP_SERVICE_DEFINE(led_http_service, NULL, &led_http_service_port,
 		    CONFIG_HTTP_SERVER_MAX_CLIENTS, 10, NULL, NULL, NULL);
 /* Register static endpoints */
@@ -324,6 +331,10 @@ int main(void)
 			thread_led,
 			NULL, NULL, NULL,
 			THD_LED_PRIORITY, 0, K_MSEC(0 * THD_LED_DELAY_MS));
+
+	if (my_tid == NULL) {
+		LOG_ERR("Failed to create LED thread");
+	}
 #endif // End THD_LED
 
 	LOG_INF("Starting Wi-Fi MCP Server application...");

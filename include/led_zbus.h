@@ -22,10 +22,15 @@ enum led_action {
 	LED_ACTION_RED,
 	LED_ACTION_GREEN,
 	LED_ACTION_BLUE,
+	LED_ACTION_CUSTOM,
 };
 
 struct led_msg {
 	enum led_action action;
+	uint8_t r;
+	uint8_t g;
+	uint8_t b;
+	bool rainbow;
 };
 
 struct led_ready_msg {

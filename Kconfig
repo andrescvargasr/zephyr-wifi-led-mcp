@@ -5,7 +5,7 @@ menu "WS2812 Configuration"
 
 config SAMPLE_LED_UPDATE_DELAY
 	int "Delay between LED updates in ms"
-	default 500
+	default 50
 	help
 	  Delay between LED updates in ms.
 
