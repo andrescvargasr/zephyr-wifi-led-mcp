@@ -62,11 +62,11 @@ static struct k_thread thd_led_data;
 static Z_KERNEL_STACK_DEFINE_IN(thd_led_stack, THD_LED_STACKSIZE, __attribute__((section(".ext_ram.bss"))));
 #else
 static Z_KERNEL_STACK_DEFINE_IN(thd_led_stack, THD_LED_STACKSIZE, __attribute__((section(".sram.bss"))));
-#endif // THD_LED
+#endif // CONFIG_ESP_SPIRAM
 
 #endif // THD_LED
 
-LOG_MODULE_REGISTER(wifi_test, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(wifi_test, LOG_LEVEL_INF);
 
 __attribute__ ((section (".ext_ram.bss"))) static struct k_sem wifi_connected_sem;
 
