@@ -64,12 +64,29 @@ static Z_KERNEL_STACK_DEFINE_IN(thd_led_stack, THD_LED_STACKSIZE, __attribute__(
 
 #endif // THD_LED
 
-LOG_MODULE_REGISTER(wifi_test, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(wifi_test, LOG_LEVEL_DBG);
 
 __attribute__ ((section (".ext_ram.bss"))) static struct k_sem wifi_connected_sem;
 
 __attribute__ ((section (".ext_ram.bss"))) static struct net_mgmt_event_callback wifi_mgmt_cb;
 __attribute__ ((section (".ext_ram.bss"))) static struct net_mgmt_event_callback dhcp_mgmt_cb;
+
+// HTTP Server
+
+struct led_command {
+    uint32_t r;
+    uint32_t g;
+    uint32_t b;
+    bool rainbow;
+};
+
+static const struct json_obj_descr led_command_descr[] = {
+	JSON_OBJ_DESCR_PRIM(struct led_command, r, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct led_command, g, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct led_command, b, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct led_command, rainbow, JSON_TOK_TRUE),
+};
+
 /* Handlers to return files with correct Content-Type and Gzip headers */
 
 // index.html
@@ -109,6 +126,94 @@ static struct http_resource_detail_static style_css_gz_resource_detail = {
 	.static_data = style_css_gz,
 	.static_data_len = style_css_gz_len,
 };
+
+// ping
+static const char ping_response[] = "pong";
+
+static struct http_resource_detail_static ping_resource_detail = {
+	.common = {
+			.type = HTTP_RESOURCE_TYPE_STATIC,
+			.bitmask_of_supported_http_methods = BIT(HTTP_GET) | BIT(HTTP_HEAD),
+			.content_type = "text/plain",
+		},
+	.static_data = ping_response,
+	.static_data_len = sizeof(ping_response) - 1,
+};
+
+
+static void parse_led_post(uint8_t *buf, size_t len)
+{
+	int ret;
+	struct led_command cmd;
+	const int expected_return_code = BIT_MASK(ARRAY_SIZE(led_command_descr));
+
+	ret = json_obj_parse(buf, len, led_command_descr, ARRAY_SIZE(led_command_descr), &cmd);
+	if (ret != expected_return_code) {
+		LOG_WRN("Failed to fully parse JSON payload, ret=%d", ret);
+		return;
+	}
+
+	LOG_DBG("POST request setting LED to state r: %d, g: %d, b: %d, rainbow: %s", cmd.r, cmd.g, cmd.b, cmd.rainbow ? "true" : "false");
+
+	// if (leds_dev != NULL) {
+	// 	if (cmd.led_state) {
+	// 		led_on(leds_dev, cmd.led_num);
+	// 	} else {
+	// 		led_off(leds_dev, cmd.led_num);
+	// 	}
+	// }
+}
+
+static int led_handler(struct http_client_ctx *client, enum http_transaction_status status,
+		       const struct http_request_ctx *request_ctx,
+		       struct http_response_ctx *response_ctx, void *user_data)
+{
+	static uint8_t post_payload_buf[64];
+	static size_t cursor;
+
+	LOG_DBG("LED handler status %d, size %zu", status, request_ctx->data_len);
+
+	if (status == HTTP_SERVER_TRANSACTION_ABORTED ||
+	    status == HTTP_SERVER_TRANSACTION_COMPLETE) {
+		cursor = 0;
+		return 0;
+	}
+
+	if (client->method == HTTP_GET) {
+		LOG_INF("GET request on LED resource");
+		return 0;
+	}
+
+	if (request_ctx->data_len + cursor > sizeof(post_payload_buf)) {
+		cursor = 0;
+		return -ENOMEM;
+	}
+
+	/* Copy payload to our buffer. Note that even for a small payload, it may arrive split into
+	 * chunks (e.g. if the header size was such that the whole HTTP request exceeds the size of
+	 * the client buffer).
+	 */
+	memcpy(post_payload_buf + cursor, request_ctx->data, request_ctx->data_len);
+	cursor += request_ctx->data_len;
+
+	if (status == HTTP_SERVER_REQUEST_DATA_FINAL) {
+		parse_led_post(post_payload_buf, cursor);
+		cursor = 0;
+	}
+
+	return 0;
+}
+
+// LED POST & GET
+static struct http_resource_detail_dynamic led_resource_detail = {
+	.common = {
+			.type = HTTP_RESOURCE_TYPE_DYNAMIC,
+			.bitmask_of_supported_http_methods = BIT(HTTP_GET) | BIT(HTTP_POST),
+		},
+	.cb = led_handler,
+	.user_data = NULL,
+};
+
 /* Define HTTP Service */
 static uint16_t led_http_service_port = NET_SAMPLE_HTTP_SERVER_SERVICE_PORT;
 HTTP_SERVICE_DEFINE(led_http_service, NULL, &led_http_service_port,
@@ -121,6 +226,9 @@ HTTP_RESOURCE_DEFINE(app_js_gz_resource, led_http_service, "/app.js",
 HTTP_RESOURCE_DEFINE(style_css_gz_resource, led_http_service, "/style.css",
 		     &style_css_gz_resource_detail);
 
+/* Register API Endpoint */
+HTTP_RESOURCE_DEFINE(res_api_led, led_http_service, "/api/led", &led_resource_detail);
+HTTP_RESOURCE_DEFINE(res_ping, led_http_service, "/api/ping", &ping_resource_detail);
 
 
 static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
@@ -212,10 +320,10 @@ int main(void)
  ******************************************************************************/
 #ifdef THD_LED
 	k_tid_t my_tid = k_thread_create(&thd_led_data, thd_led_stack,
-									K_THREAD_STACK_SIZEOF(thd_led_stack),
-									thread_led,
-									NULL, NULL, NULL,
-									THD_LED_PRIORITY, 0, K_MSEC(0 * THD_LED_DELAY_MS));
+			K_THREAD_STACK_SIZEOF(thd_led_stack),
+			thread_led,
+			NULL, NULL, NULL,
+			THD_LED_PRIORITY, 0, K_MSEC(0 * THD_LED_DELAY_MS));
 #endif // End THD_LED
 
 	LOG_INF("Starting Wi-Fi MCP Server application...");
