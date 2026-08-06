@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Andrés Camilo Román Vargas
  *
  * @file mcp_server.c
- * @author Andres C. Román V. (camilo.vargas@technaid.com gh: @andrescvargasr)
+ * @author Andres C. Román V. (andresc.vargasr@gmail.com gh: @andrescvargasr)
  * @brief
  * @version 1.0
  * @date 2026-07-24

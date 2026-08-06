@@ -46,6 +46,9 @@
 #include <zephyr/net/net_config.h>
 #include "web_assets.h"
 
+// mDNS
+#include "mdns_service.h"
+
 #include "params.h"
 #include <zephyr/zbus/zbus.h>
 #include "led_zbus.h"
@@ -363,6 +366,8 @@ int main(void)
 	k_sem_give(&wifi_connected_sem);
 
 	http_server_start();
+
+	mdns_service();
 
 	return 0;
 }
