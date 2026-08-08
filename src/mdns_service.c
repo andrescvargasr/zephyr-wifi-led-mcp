@@ -167,17 +167,17 @@ void mdns_service()
 	/* The advanced use case: ephemeral port */
 #if defined(CONFIG_NET_IPV6)
 	DNS_SD_REGISTER_SERVICE(mcp_server, CONFIG_NET_HOSTNAME,
-				"_mcp-led", "_tcp", "local", DNS_SD_EMPTY_TXT,
+				"_mcp_led", "_tcp", "local", DNS_SD_EMPTY_TXT,
 				&((struct sockaddr_in6 *)&server_addr)->sin6_port);
 #elif defined(CONFIG_NET_IPV4)
 	DNS_SD_REGISTER_SERVICE(mcp_server, CONFIG_NET_HOSTNAME,
-				"_mcp-led", "_tcp", "local", DNS_SD_EMPTY_TXT,
+				"_mcp_led", "_tcp", "local", DNS_SD_EMPTY_TXT,
 				&((struct sockaddr_in *)&server_addr)->sin_port);
 #endif
 #else
 	/* The simple use case: fixed port */
 	DNS_SD_REGISTER_TCP_SERVICE(mcp_server, CONFIG_NET_HOSTNAME,
-				    "_mcp-led", "local", DNS_SD_EMPTY_TXT, DEFAULT_PORT);
+				    "_mcp_led", "local", DNS_SD_EMPTY_TXT, DEFAULT_PORT);
 #endif
 
 	if (IS_ENABLED(CONFIG_NET_IPV6)) {
