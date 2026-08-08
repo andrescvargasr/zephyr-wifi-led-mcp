@@ -249,6 +249,43 @@ Flash firmware and immediately launch the serial monitor in a single command:
    # USB native port on Linux (ESP32-C5)
    west flash --esp-device /dev/ttyACM0 && west espressif monitor -p /dev/ttyACM0
 
+Discovering Device IP via mDNS (Avahi)
+======================================
+
+Once the board connects to Wi-Fi, it advertises its hostname as ``mcp-led.local``. You can resolve its assigned IPv4 address or browse mDNS services on Linux/macOS using Avahi tools:
+
+1. **Resolve IPv4 address by hostname:**
+
+   .. code-block:: console
+
+      avahi-resolve-host-name -4 mcp-led.local
+      # or:
+      avahi-resolve -4 -n mcp-led.local
+
+   *Output example:*
+
+   .. code-block:: text
+
+      mcp-led.local    192.168.1.46
+
+2. **Resolve services using DNS Service Discovery:**
+
+   .. code-block:: console
+
+      avahi-browse -t -r _mcp-led._tcp
+
+3. **Ping device by mDNS hostname:**
+
+   .. code-block:: console
+
+      ping mcp-led.local
+
+4. **Query via `dns-sd` (macOS / Linux):**
+
+   .. code-block:: console
+
+      dns-sd -G v4 mcp-led.local
+
 Sample Console Interaction
 ==========================
 
