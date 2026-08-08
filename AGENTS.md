@@ -9,8 +9,12 @@ This file provides workspace context, build instructions, and development guidel
 - **Project Name:** `zephyr-wifi-led-mcp`
 - **Path:** `/home/user/zephyrproject/projects/zephyr-wifi-led-mcp`
 - **RTOS:** Zephyr RTOS (v4.4.99+, located at `/home/user/zephyrproject/zephyr`)
-- **Primary Purpose:** Test Wi-Fi driver functionality, Wi-Fi shell commands (`wifi scan`, `wifi connect`, `wifi disconnect`), network stack management (`net_shell`, `net_if`), PSRAM allocation/relocation, auto-connection with stored Wi-Fi credentials upon boot, HTTP Model Context Protocol (MCP) server tool execution, and Zbus hardware control integration.
-- **Target Board / Architecture:** Default configured board is `esp32c5_devkitc/esp32c5/hpcore` (ESP32-C5 RISC-V High-Performance Core). Can also target Nordic `nrf7002dk/nrf5340/cpuapp` or other supported Wi-Fi boards.
+- **Primary Purpose:** Test Wi-Fi driver functionality, Wi-Fi shell commands (`wifi scan`, `wifi connect`, `wifi disconnect`), network stack management (`net_shell`, `net_if`), PSRAM allocation/relocation, auto-connection with stored Wi-Fi credentials upon boot using Net Connection Manager, HTTP Model Context Protocol (MCP) server tool execution, and Zbus hardware control integration.
+- **Target Boards / Architectures:**
+  - `esp32c5_devkitc/esp32c5/hpcore` (Default ESP32-C5 DevKitC RISC-V HP Core)
+  - `xiao_esp32c5/esp32c5/hpcore` (Seeed Studio XIAO ESP32-C5)
+  - `xiao_esp32s3/esp32s3/procpu` (Seeed Studio XIAO ESP32-S3 with Octal SPI RAM)
+  - Nordic `nrf7002dk/nrf5340/cpuapp` or other supported Wi-Fi boards.
 
 ---
 
@@ -31,14 +35,18 @@ The Zephyr environment relies on a dedicated Python virtual environment:
 ```
 zephyr-wifi-led-mcp/
 ├── .gitignore                  # Git ignore rules for build artifacts and temporary files
-├── CMakeLists.txt              # CMake build script (appends default snippets, sets CONFIG_BUILD_OUTPUT_META=y, and includes include/)
+├── CMakeLists.txt              # CMake build script (includes net common, sets default snippets, and CONFIG_BUILD_OUTPUT_META=y)
 ├── Kconfig                     # Application Kconfig options (LED brightness, update delay)
 ├── VERSION                     # Project version file
 ├── app.overlay                 # Devicetree overlay for WS2812 LED strip (I2S/DMA)
-├── prj.conf                    # Main Kconfig application configuration
+├── prj.conf                    # Main Kconfig application configuration (128KB heap, 4KB system workqueue, Net Conn Mgr)
 ├── overlay-debug.conf          # Debug Kconfig overlay configuration
-├── README.rst                  # Documentation, snippet testing guide, SPDX generation, and sample logs
+├── README.rst                  # Documentation, board guide, snippet testing, SPDX generation, and sample logs
 ├── tests.yaml                  # Twister test configuration for automated test runs
+├── boards/
+│   ├── xiao_esp32c5_hpcore.overlay # Devicetree overlay for Seeed XIAO ESP32-C5 (I2S LED strip on GPIO8)
+│   ├── xiao_esp32s3_procpu.conf    # Kconfig overlay for Seeed XIAO ESP32-S3 (Octal SPIRAM configuration)
+│   └── xiao_esp32s3_procpu.overlay # Devicetree overlay for Seeed XIAO ESP32-S3 (I2S LED strip layout)
 ├── esp32/
 │   └── overlay_enterprise.conf # Kconfig overlay for ESP32 WPA Enterprise features
 ├── include/
@@ -48,21 +56,20 @@ zephyr-wifi-led-mcp/
 │   └── thd_led.h               # Header file declaring LED strip thread functions
 ├── src/
 │   ├── _start_threads.c        # Thread initialization boilerplate (defines thd_led thread)
-│   ├── main.c                  # Main application entry point, Wi-Fi auto-connect, DHCP management, and MCP startup
+│   ├── main.c                  # Main application entry point, Wi-Fi auto-connect, wait_for_network(), and MCP startup
 │   ├── mcp_server.c            # MCP HTTP server initialization, tool callbacks, and Zbus publishing
 │   └── thd_led.c               # LED strip HSV thread function with 5-second periodic logging
 └── build/                      # Generated build artifacts (managed by west)
 ```
 
 ### Application Features & Threads
-- **LED Strip Thread (`src/thd_led.c`):** Runs the WS2812 RGB LED strip driven over I2S/DMA via `app.overlay`. Animates HSV rainbow colors and logs status every 5 seconds.
+- **LED Strip Thread (`src/thd_led.c`):** Runs the WS2812 RGB LED strip driven over I2S/DMA via `app.overlay` or board overlays. Animates HSV rainbow colors and logs status every 5 seconds.
 - **Thread Management (`src/_start_threads.c`):** Boilerplate defining system threads (e.g. `thd_led`) using `K_THREAD_DEFINE`.
-- **Main Application Module (`src/main.c`):** Handles Wi-Fi status callbacks, DHCP event notifications, auto-connection using saved credentials in NVS, and launches the MCP server.
+- **Main Application Module (`src/main.c`):** Triggers `auto_connect()` via NVS credentials, waits for IP assignment via `wait_for_network()`, and launches the MCP server, HTTP server, and mDNS responder.
 - **MCP HTTP Server & Zbus (`src/mcp_server.c`, `include/mcp_server.h`, `include/led_zbus.h`):** Runs an HTTP MCP server listening on port 8080 (`/mcp` endpoint) under hostname `mcp-led`. Registers MCP tools:
   - `delayed_response`: Asynchronous tool for SSE ping keep-alive and cancellation testing.
   - `led_control`: Remote LED command tool publishing to Zbus channel `led_chan` (`on`, `off`, `toggle`, `red`, `green`, `blue`).
 - **PSRAM Size Output:** Queries and prints detected PSRAM size on startup using `esp_psram_get_size()` or Devicetree properties.
-- **Net Management Callbacks:** Subscribes to `NET_EVENT_WIFI_CONNECT_RESULT`, `NET_EVENT_WIFI_DISCONNECT_RESULT`, and `NET_EVENT_IPV4_DHCP_BOUND`. Note: Callback handlers must use `uint64_t mgmt_event` parameter type per Zephyr 4.4+ signature specifications.
 
 ### Default Snippets (`CMakeLists.txt`)
 `CMakeLists.txt` appends default snippets to `SNIPPET` prior to `find_package(Zephyr)`:
@@ -79,6 +86,13 @@ All commands should be executed from the project root (`/home/user/zephyrproject
 
 ### Set Target Board
 ```bash
+# Seeed Studio XIAO ESP32-C5
+west config build.board xiao_esp32c5/esp32c5/hpcore
+
+# Seeed Studio XIAO ESP32-S3
+west config build.board xiao_esp32s3/esp32s3/procpu
+
+# Default ESP32-C5 DevKitC
 west config build.board esp32c5_devkitc/esp32c5/hpcore
 ```
 
@@ -87,14 +101,14 @@ west config build.board esp32c5_devkitc/esp32c5/hpcore
 # Standard build (uses default snippets configured in CMakeLists.txt)
 west build
 
-# Pristine (clean) build for ESP32-C5
-west build -p always -b esp32c5_devkitc/esp32c5/hpcore
+# Pristine (clean) build for Seeed XIAO ESP32-C5
+west build -p always -b xiao_esp32c5/esp32c5/hpcore --build-dir build/xiao_esp32c5
+
+# Pristine (clean) build for Seeed XIAO ESP32-S3
+west build -p always -b xiao_esp32s3/esp32s3/procpu --build-dir build/xiao_esp32s3
 
 # Build with custom/additional snippets
 west build -p -S wifi-credentials -S espressif-psram-8M -S espressif-psram-reloc -S espressif-psram-wifi
-
-# Build with specific Kconfig overlay (e.g. debug or ESP32 enterprise)
-west build -b esp32c5_devkitc/esp32c5/hpcore -- -DEXTRA_CONF_FILE="overlay-debug.conf"
 ```
 
 ### SPDX Bill of Materials (SBOM) Generation
@@ -122,6 +136,12 @@ west flash --esp-device /dev/ttyUSB0
 
 ### Serial Monitor
 ```bash
+west espressif monitor -p /dev/ttyACM0
+```
+
+For Xiao boards:
+
+```bash
 west espressif monitor -p /dev/ttyUSB0
 ```
 
@@ -140,23 +160,22 @@ west twister -T .
   - **Tabs:** 8-character tab indentations.
   - **Naming:** `snake_case` for function and variable names; `UPPER_CASE` for macros and Kconfig options.
   - **Types:** Use exact-width types (`uint8_t`, `uint32_t`, `ssize_t`, `bool`) from `<zephyr/types.h>` or standard C headers.
-  - **Net Mgmt Callbacks:** Handler functions must match `net_mgmt_event_handler_t` (`void (*)(struct net_mgmt_event_callback *cb, uint64_t mgmt_event, struct net_if *iface)`).
 
 ### Kconfig Conventions (`prj.conf`)
 - All network and Wi-Fi features are driven by Kconfig symbols starting with `CONFIG_`.
 - Key configurations in this project:
-  - `CONFIG_NETWORKING=y` - Enable IP networking stack.
-  - `CONFIG_WIFI=y` - Enable Wi-Fi management subsystem.
-  - `CONFIG_NET_L2_WIFI_SHELL=y` - Enable Wi-Fi shell commands.
-  - `CONFIG_NET_SHELL=y` - Enable network interface shell commands.
-  - `CONFIG_NET_MGMT_EVENT_QUEUE_SIZE` / `CONFIG_NET_MGMT_EVENT_QUEUE_TIMEOUT` - Tuned for Wi-Fi scan results processing without queue overflows.
+  - `CONFIG_NETWORKING=y` / `CONFIG_WIFI=y` - Enable IP networking and Wi-Fi subsystems.
+  - `CONFIG_NET_CONNECTION_MANAGER=y` - Network Connection Manager support for automatic connection management.
+  - `CONFIG_HEAP_MEM_POOL_SIZE=81920` - 80KB heap pool for MCP server, HTTP server, mDNS, and Wi-Fi buffer allocations.
+  - `CONFIG_SYSTEM_WORKQUEUE_STACK_SIZE=4096` - 4KB stack size for system workqueue to handle network management events safely.
+  - `CONFIG_NET_RX_STACK_SIZE=4096` / `CONFIG_NET_TX_STACK_SIZE=4096` - 4KB network stack sizes.
+  - `CONFIG_STACK_SENTINEL=y` - Stack overflow protection sentinel.
   - `CONFIG_MCP_SERVER=y` - Enable Model Context Protocol (MCP) server library.
   - `CONFIG_MCP_HTTP_PORT=8080` / `CONFIG_MCP_HTTP_ENDPOINT="/mcp"` - MCP HTTP server port and endpoint.
   - `CONFIG_MDNS_RESPONDER=y` / `CONFIG_NET_HOSTNAME="mcp-led"` - Zero-conf mDNS hostname resolution.
-  - `CONFIG_MCP_MAX_TOOLS=4` / `CONFIG_MCP_REQUEST_WORKERS=2` - MCP tool capacity and worker thread allocations.
 
 ### Devicetree (`.dts` / `.overlay`)
-- Hardware pin assignments or peripheral nodes are customized in `app.overlay` or board overlays in `boards/<board_name>.overlay`.
+- Hardware pin assignments or peripheral nodes are customized in `app.overlay` or board overlays in `boards/<board_name>.overlay` (e.g. `boards/xiao_esp32c5_hpcore.overlay` and `boards/xiao_esp32s3_procpu.overlay`).
 
 ### Verification Requirement
 - Before completing any task, always verify that the project compiles cleanly using `west build` inside `zvenv`.

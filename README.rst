@@ -67,8 +67,12 @@ The application features an HTTP-based MCP server running on port 8080 (endpoint
 Project Structure
 =================
 
-- ``app.overlay``: Devicetree overlay configuring WS2812 LED strip over I2S/DMA.
+- ``app.overlay``: Default devicetree overlay configuring WS2812 LED strip over I2S/DMA.
+- ``boards/xiao_esp32c5_hpcore.overlay``: Devicetree overlay for Seeed Studio XIAO ESP32-C5 (I2S LED strip on GPIO8).
+- ``boards/xiao_esp32s3_procpu.conf``: Kconfig configuration overlay for Seeed Studio XIAO ESP32-S3 (Octal SPIRAM).
+- ``boards/xiao_esp32s3_procpu.overlay``: Devicetree overlay for Seeed Studio XIAO ESP32-S3 (I2S LED strip layout).
 - ``Kconfig``: Sample configuration options for LED brightness and update delay.
+- ``prj.conf``: Main Kconfig application configuration (80 KB heap pool, 4KB system workqueue stack, Net Conn Mgr).
 - ``VERSION``: Application version metadata file.
 - ``include/led_zbus.h``: Zbus channel and message declarations for LED control.
 - ``include/mcp_server.h``: Function prototypes and interface for the MCP HTTP server.
@@ -77,7 +81,7 @@ Project Structure
 - ``src/_start_threads.c``: Thread management boilerplate defining and launching system threads (e.g. ``thd_led``).
 - ``src/mcp_server.c``: MCP HTTP server implementation, registering tools (``delayed_response``, ``led_control``) and publishing Zbus messages.
 - ``src/thd_led.c``: WS2812 LED strip thread function implementing smooth HSV rainbow cycling and periodic logging (every 5 seconds).
-- ``src/wifi_test.c``: Wi-Fi driver, auto-connect, event management, and MCP server startup.
+- ``src/main.c``: Main application entry point, Wi-Fi auto-connect, ``wait_for_network()`` initialization, and MCP server startup.
 
 Requirements
 ************
@@ -86,7 +90,9 @@ Hardware Requirements
 =====================
 
 * **Supported Target Boards:**
-  - **ESP32-C5:** ``esp32c5_devkitc/esp32c5/hpcore`` (ESP32-C5 RISC-V High-Performance Core)
+  - **Seeed Studio XIAO ESP32-C5:** ``xiao_esp32c5/esp32c5/hpcore``
+  - **Seeed Studio XIAO ESP32-S3:** ``xiao_esp32s3/esp32s3/procpu`` (with Octal SPIRAM)
+  - **ESP32-C5 DevKitC:** ``esp32c5_devkitc/esp32c5/hpcore`` (ESP32-C5 RISC-V High-Performance Core)
   - **Nordic nRF7002:** ``nrf7002dk/nrf5340/cpuapp``
 * **Peripherals:** WS2812 RGB LED strip driven over I2S/DMA.
 * **Network:** Wi-Fi Access Point with DHCP enabled.
@@ -125,22 +131,35 @@ Set Target Board Configuration
 
 .. code-block:: console
 
+   # Seeed Studio XIAO ESP32-C5
+   west config build.board xiao_esp32c5/esp32c5/hpcore
+
+   # Seeed Studio XIAO ESP32-S3
+   west config build.board xiao_esp32s3/esp32s3/procpu
+
+   # ESP32-C5 DevKitC
    west config build.board esp32c5_devkitc/esp32c5/hpcore
 
 Build Commands
 ==============
 
-Incremental build using configured board:
+Standard incremental build using configured board:
 
 .. code-block:: console
 
    west build
 
-Pristine (clean) build for ESP32-C5:
+Pristine (clean) build for Seeed XIAO ESP32-C5:
 
 .. code-block:: console
 
-   west build -p always -b esp32c5_devkitc/esp32c5/hpcore
+   west build -p always -b xiao_esp32c5/esp32c5/hpcore --build-dir build/xiao_esp32c5
+
+Pristine (clean) build for Seeed XIAO ESP32-S3:
+
+.. code-block:: console
+
+   west build -p always -b xiao_esp32s3/esp32s3/procpu --build-dir build/xiao_esp32s3
 
 Build with Kconfig overlay (e.g. debug overlay):
 
