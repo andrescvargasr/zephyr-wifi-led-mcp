@@ -25,11 +25,13 @@
 
 LOG_MODULE_REGISTER(mcp_app_server, LOG_LEVEL_INF);
 
-#define DELAYED_RESPONSE_TEXT "Hello from the delayed response tool!"
-
+#if defined(CONFIG_ESP_SPIRAM)
 __attribute__ ((section (".ext_ram.bss"))) mcp_server_ctx_t server;
-
 __attribute__ ((section (".ext_ram.bss"))) static bool led_initialized;
+#else
+mcp_server_ctx_t server;
+static bool led_initialized;
+#endif // CONFIG_ESP_SPIRAM
 
 struct mcp_led_args {
 	int32_t r;
@@ -332,7 +334,7 @@ int mcp_server(void)
 
 	/* Check if LED device is ready */
 	struct led_ready_msg ready_msg = {0};
-	ret = zbus_chan_read(&led_ready_chan, &ready_msg, K_MSEC(500));
+	ret = zbus_chan_read(&led_ready_chan, &ready_msg, K_MSEC(50));
 	if (ret == 0 && ready_msg.is_ready) {
 		led_initialized = true;
 		LOG_INF("LED device is ready (checked via Zbus channel)");

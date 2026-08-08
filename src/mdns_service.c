@@ -3,11 +3,18 @@
  *
  * @file mdns_service.c
  * @author Andres C. Román V. (andresc.vargasr@gmail.com gh: @andrescvargasr)
- * @brief
  * @version 1.0
  * @date 2026-08-06
  *
- * mDNS Service Discover.
+ * @brief mDNS Service Discover.
+ *
+ * Note that mDNS support requires no application interaction with zephyr,
+ * beyond optional runtime hostname configuration calls and setting
+ * CONFIG_MDNS_RESPONDER=y.
+ *
+ * The service() function provides an echo server to make it possible to
+ * verify that the IP address resolved by mDNS is the system that this
+ * code is running upon.
  *
  * SPDX-License-Identifier: MIT
  */

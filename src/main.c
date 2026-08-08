@@ -66,26 +66,13 @@ static struct k_thread thd_led_data;
 
 #if defined(CONFIG_ESP_SPIRAM)
 static Z_KERNEL_STACK_DEFINE_IN(thd_led_stack, THD_LED_STACKSIZE, __attribute__((section(".ext_ram.bss"))));
-__attribute__ ((section (".ext_ram.bss"))) static struct k_sem ip_address_sem;
-
-__attribute__ ((section (".ext_ram.bss"))) static struct net_mgmt_event_callback wifi_mgmt_cb;
-__attribute__ ((section (".ext_ram.bss"))) static struct net_mgmt_event_callback dhcp_mgmt_cb;
 #else
 static Z_KERNEL_STACK_DEFINE_IN(thd_led_stack, THD_LED_STACKSIZE, __attribute__((section(".sram.bss"))));
-static struct k_sem ip_address_sem;
-
-static struct net_mgmt_event_callback wifi_mgmt_cb;
-static struct net_mgmt_event_callback dhcp_mgmt_cb;
 #endif // CONFIG_ESP_SPIRAM
 
 #endif // THD_LED
 
 LOG_MODULE_REGISTER(wifi_test, LOG_LEVEL_INF);
-
-__attribute__ ((section (".ext_ram.bss"))) static struct k_sem wifi_connected_sem;
-
-__attribute__ ((section (".ext_ram.bss"))) static struct net_mgmt_event_callback wifi_mgmt_cb;
-__attribute__ ((section (".ext_ram.bss"))) static struct net_mgmt_event_callback dhcp_mgmt_cb;
 
 // HTTP Server
 
@@ -251,41 +238,6 @@ HTTP_RESOURCE_DEFINE(style_css_gz_resource, led_http_service, "/style.css",
 HTTP_RESOURCE_DEFINE(res_api_led, led_http_service, "/api/led", &led_resource_detail);
 HTTP_RESOURCE_DEFINE(res_ping, led_http_service, "/api/ping", &ping_resource_detail);
 
-
-static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-				     uint64_t mgmt_event,
-				     struct net_if *iface)
-{
-	const struct wifi_status *status = (const struct wifi_status *)cb->info;
-
-	if (mgmt_event == NET_EVENT_WIFI_CONNECT_RESULT) {
-		if (status->status == 0) {
-			LOG_INF("Wi-Fi connected successfully!");
-		} else {
-			LOG_ERR("Wi-Fi connection failed (status: %d)", status->status);
-		}
-	} else if (mgmt_event == NET_EVENT_WIFI_DISCONNECT_RESULT) {
-		LOG_INF("Wi-Fi disconnected (status: %d)", status->status);
-	}
-}
-
-static void dhcp_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-				     uint64_t mgmt_event,
-				     struct net_if *iface)
-{
-	if (mgmt_event == NET_EVENT_IPV4_DHCP_BOUND) {
-		char buf[NET_IPV4_ADDR_LEN];
-		struct net_if_dhcpv4 *data = (struct net_if_dhcpv4 *)cb->info;
-
-		LOG_INF("DHCP IP Address acquired: %s",
-			net_addr_ntop(AF_INET, &data->requested_ip, buf, sizeof(buf)));
-
-		if (k_sem_count_get(&ip_address_sem) == 0) {
-			k_sem_give(&ip_address_sem);	// Send signal to main thread to continue execution
-		}
-	}
-}
-
 /**
  * @brief Auto-connect to Wi-Fi using credentials saved in flash memory.
  *
@@ -321,8 +273,6 @@ int auto_connect(void)
 
 int main(void)
 {
-	int ret;
-
 #if defined(CONFIG_ESP_SPIRAM)
 	if (esp_psram_is_initialized()) {
 		printk("PSRAM size: %zu bytes (%zu MB)\n",
@@ -333,10 +283,9 @@ int main(void)
 	}
 
 #elif DT_NODE_EXISTS(DT_NODELABEL(psram0))
-	printk("PSRAM size: %u bytes (%u MB)\n",
+	printk("PSRAM node size (not used): %u bytes (%u MB)\n",
 	       DT_PROP(DT_NODELABEL(psram0), size),
 	       DT_PROP(DT_NODELABEL(psram0), size) / (1024 * 1024));
-	
 #else
 	LOG_WRN("PSRAM not available");
 #endif
@@ -358,37 +307,20 @@ int main(void)
 
 	LOG_INF("Starting Wi-Fi MCP LED Server application...");
 
-	k_sem_init(&ip_address_sem, 0, 1);
-
-	/* Register Wi-Fi event callbacks */
-	net_mgmt_init_event_callback(&wifi_mgmt_cb, wifi_mgmt_event_handler,
-				      NET_EVENT_WIFI_CONNECT_RESULT |
-				      NET_EVENT_WIFI_DISCONNECT_RESULT);
-	net_mgmt_add_event_callback(&wifi_mgmt_cb);
-
-	/* Register DHCP event callback */
-	net_mgmt_init_event_callback(&dhcp_mgmt_cb, dhcp_mgmt_event_handler,
-				      NET_EVENT_IPV4_DHCP_BOUND);
-	net_mgmt_add_event_callback(&dhcp_mgmt_cb);
-
 	/* Trigger auto-connect on startup */
-		wait_for_network();
-	LOG_INF("Waiting for Wi-Fi connection and IP address");
+	auto_connect();
 
-	/* Wait for Wi-Fi connection (signal from event handler) */
-	// k_sem_take(&ip_address_sem, K_FOREVER);
+	LOG_INF("Waiting for Wi-Fi connection and IP address");
+	wait_for_network();	// From Zephyr net/common in CMakeLists.txt
 
 	LOG_INF("Wi-Fi connected! Set MCP server");
 	mcp_server();
 
 	LOG_INF("Set HTTP server");
 	http_server_start();
-
+	
 	LOG_INF("Set mDNS service");
 	mdns_service();
-
-	// k_sem_give(&ip_address_sem);
-	// LOG_INF("Giving kernel semaphore");
 
 	return 0;
 }
