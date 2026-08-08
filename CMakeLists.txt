@@ -22,8 +22,11 @@ target_link_libraries(app PRIVATE zephyr_interface zephyr)
 # Include external headers
 zephyr_include_directories(include)
 
+# Include external utils
+include(${ZEPHYR_BASE}/samples/net/common/common.cmake)
+
 zephyr_linker_sources(SECTIONS sections-rom.ld)
-zephyr_linker_section_ifdef(CONFIG_NET_SAMPLE_HTTP_SERVICE
+zephyr_linker_section(
   NAME http_resource_desc_led_http_service
   KVMA RAM_REGION GROUP RODATA_REGION
 )

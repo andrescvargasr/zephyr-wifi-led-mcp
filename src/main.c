@@ -4,7 +4,7 @@
  * @file main.c
  * @author Andres C. Román V. (camilo.vargas@technaid.com gh: @andrescvargasr)
  * @brief
- * @version 1.0
+ * @version 1.1
  * @date 2026-07-24
  *
  * Main application entry point for MCP, LED, and Wi-Fi interfaces.
@@ -53,6 +53,9 @@
 #include <zephyr/zbus/zbus.h>
 #include "led_zbus.h"
 
+// Include external utils
+#include "net_sample_common.h"
+
 // Threads
 #ifdef THD_LED
 #include "thd_led.h"
@@ -63,8 +66,16 @@ static struct k_thread thd_led_data;
 
 #if defined(CONFIG_ESP_SPIRAM)
 static Z_KERNEL_STACK_DEFINE_IN(thd_led_stack, THD_LED_STACKSIZE, __attribute__((section(".ext_ram.bss"))));
+__attribute__ ((section (".ext_ram.bss"))) static struct k_sem ip_address_sem;
+
+__attribute__ ((section (".ext_ram.bss"))) static struct net_mgmt_event_callback wifi_mgmt_cb;
+__attribute__ ((section (".ext_ram.bss"))) static struct net_mgmt_event_callback dhcp_mgmt_cb;
 #else
 static Z_KERNEL_STACK_DEFINE_IN(thd_led_stack, THD_LED_STACKSIZE, __attribute__((section(".sram.bss"))));
+static struct k_sem ip_address_sem;
+
+static struct net_mgmt_event_callback wifi_mgmt_cb;
+static struct net_mgmt_event_callback dhcp_mgmt_cb;
 #endif // CONFIG_ESP_SPIRAM
 
 #endif // THD_LED
@@ -116,8 +127,8 @@ static struct http_resource_detail_static app_js_gz_resource_detail = {
 			.content_type = "text/javascript",
 		},
 	.static_data = app_js_gz,
-	// .static_data_len = app_js_gz_len,
-	.static_data_len = sizeof(app_js_gz),
+	.static_data_len = app_js_gz_len,
+	// .static_data_len = sizeof(app_js_gz),
 };
 
 // style.css
@@ -250,7 +261,6 @@ static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 	if (mgmt_event == NET_EVENT_WIFI_CONNECT_RESULT) {
 		if (status->status == 0) {
 			LOG_INF("Wi-Fi connected successfully!");
-			k_sem_give(&wifi_connected_sem);	// Send signal to main thread to continue execution
 		} else {
 			LOG_ERR("Wi-Fi connection failed (status: %d)", status->status);
 		}
@@ -269,6 +279,10 @@ static void dhcp_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 
 		LOG_INF("DHCP IP Address acquired: %s",
 			net_addr_ntop(AF_INET, &data->requested_ip, buf, sizeof(buf)));
+
+		if (k_sem_count_get(&ip_address_sem) == 0) {
+			k_sem_give(&ip_address_sem);	// Send signal to main thread to continue execution
+		}
 	}
 }
 
@@ -307,6 +321,8 @@ int auto_connect(void)
 
 int main(void)
 {
+	int ret;
+
 #if defined(CONFIG_ESP_SPIRAM)
 	if (esp_psram_is_initialized()) {
 		printk("PSRAM size: %zu bytes (%zu MB)\n",
@@ -340,9 +356,9 @@ int main(void)
 	}
 #endif // End THD_LED
 
-	LOG_INF("Starting Wi-Fi MCP Server application...");
+	LOG_INF("Starting Wi-Fi MCP LED Server application...");
 
-	k_sem_init(&wifi_connected_sem, 0, 1);
+	k_sem_init(&ip_address_sem, 0, 1);
 
 	/* Register Wi-Fi event callbacks */
 	net_mgmt_init_event_callback(&wifi_mgmt_cb, wifi_mgmt_event_handler,
@@ -356,18 +372,23 @@ int main(void)
 	net_mgmt_add_event_callback(&dhcp_mgmt_cb);
 
 	/* Trigger auto-connect on startup */
-	auto_connect();
+		wait_for_network();
+	LOG_INF("Waiting for Wi-Fi connection and IP address");
 
 	/* Wait for Wi-Fi connection (signal from event handler) */
-	k_sem_take(&wifi_connected_sem, K_FOREVER);
+	// k_sem_take(&ip_address_sem, K_FOREVER);
 
+	LOG_INF("Wi-Fi connected! Set MCP server");
 	mcp_server();
 
-	k_sem_give(&wifi_connected_sem);
-
+	LOG_INF("Set HTTP server");
 	http_server_start();
 
+	LOG_INF("Set mDNS service");
 	mdns_service();
+
+	// k_sem_give(&ip_address_sem);
+	// LOG_INF("Giving kernel semaphore");
 
 	return 0;
 }
