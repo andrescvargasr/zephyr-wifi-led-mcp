@@ -1,28 +1,30 @@
 /**
- * ESP32-C5 LED Webpage Controller - Client Logic
- * Handles user interactions, updates the dynamic virtual LED,
+ * ESP32 16x16 LED Matrix Webpage Controller - Client Logic
+ * Manages 256 addressable LED pixel states, grid interactions, paint mode,
  * and communicates with the ESP32 Zephyr HTTP Server API.
  */
 
-// Configuration
+const MATRIX_SIZE = 16;
+const TOTAL_PIXELS = MATRIX_SIZE * MATRIX_SIZE;
+
 const CONFIG = {
-    // API settings
     apiEndpoint: '/api/led',
-    apiMode: 'json', // Options: 'query' (e.g. ?r=255&g=0&b=0&rainbow=0) or 'json' (e.g. {"r":255,"g":0,"b":0,"rainbow":false})
+    apiMode: 'json',
     apiMethod: 'POST',
-
-    // Safety limit: wait at least this long (ms) between slider requests to avoid overwhelming the ESP32 socket
-    debounceDelay: 120,
-
-    // Automatically fallback to mock mode if requests fail (saves developer test time locally)
+    debounceDelay: 100,
     autoSimulationFallback: true
 };
 
-// UI Elements
+// UI Element Cache
 const els = {
     connectionStatus: document.getElementById('connection-status'),
     statusDot: document.querySelector('.status-dot'),
     statusText: document.querySelector('.status-text'),
+    matrixGrid: document.getElementById('matrix-grid'),
+    matrixTooltip: document.getElementById('matrix-tooltip'),
+    pixelBadge: document.getElementById('pixel-badge'),
+    selectedPixelLabel: document.getElementById('selected-pixel-label'),
+    selectedLedTitle: document.getElementById('selected-led-title'),
     ledHalo: document.getElementById('led-halo'),
     ledLens: document.getElementById('led-lens'),
     rgbText: document.getElementById('rgb-text'),
@@ -37,6 +39,9 @@ const els = {
     valB: document.getElementById('val-b'),
     colorPicker: document.getElementById('color-picker'),
     presetBtns: document.querySelectorAll('.preset-btn'),
+    toolPaint: document.getElementById('tool-paint'),
+    toolFillAll: document.getElementById('tool-fill-all'),
+    toolClearAll: document.getElementById('tool-clear-all'),
     consoleLogs: document.getElementById('console-logs'),
     consoleToggle: document.getElementById('console-toggle'),
     consoleCard: document.querySelector('.console-card')
@@ -44,37 +49,133 @@ const els = {
 
 // State Variables
 let state = {
-    r: 0,
-    g: 0,
-    b: 0,
+    matrix: Array.from({ length: TOTAL_PIXELS }, () => ({ r: 0, g: 0, b: 0 })),
+    selectedIndex: 0,
+    paintMode: false,
+    isMouseDown: false,
     rainbow: false,
-    isSimulating: true, // starts in simulating unless we verify a real connection
+    isSimulating: true,
     lastSentTimestamp: 0,
     pendingUpdateTimeout: null
 };
 
 // Initialize Application
 document.addEventListener('DOMContentLoaded', () => {
+    buildMatrixGrid();
     setupEventListeners();
     checkInitialConnection();
-    updateUI();
+    selectPixel(0);
 });
 
-// Setup Listeners
-function setupEventListeners() {
-    // Sliders
-    const handleSliderInput = () => {
-        state.r = parseInt(els.sliderR.value);
-        state.g = parseInt(els.sliderG.value);
-        state.b = parseInt(els.sliderB.value);
+// Build 16x16 Grid Elements
+function buildMatrixGrid() {
+    els.matrixGrid.innerHTML = '';
+    for (let i = 0; i < TOTAL_PIXELS; i++) {
+        const pixel = document.createElement('div');
+        pixel.className = 'matrix-pixel';
+        pixel.dataset.index = i;
+        const row = Math.floor(i / MATRIX_SIZE);
+        const col = i % MATRIX_SIZE;
+        pixel.dataset.row = row;
+        pixel.dataset.col = col;
+        els.matrixGrid.appendChild(pixel);
+    }
+}
 
-        // Turn off rainbow if user adjusts sliders
+// Setup Event Listeners
+function setupEventListeners() {
+    // Matrix Pixel Clicks & Drag Painting
+    document.addEventListener('mousedown', () => { state.isMouseDown = true; });
+    document.addEventListener('mouseup', () => { state.isMouseDown = false; });
+
+    els.matrixGrid.addEventListener('click', (e) => {
+        const pixel = e.target.closest('.matrix-pixel');
+        if (pixel) {
+            const idx = parseInt(pixel.dataset.index);
+            selectPixel(idx);
+        }
+    });
+
+    els.matrixGrid.addEventListener('mouseover', (e) => {
+        const pixel = e.target.closest('.matrix-pixel');
+        if (pixel) {
+            const idx = parseInt(pixel.dataset.index);
+            const row = pixel.dataset.row;
+            const col = pixel.dataset.col;
+
+            // Show Tooltip
+            els.matrixTooltip.textContent = `LED #${idx} (R${row}, C${col})`;
+            els.matrixTooltip.classList.add('visible');
+
+            // Position tooltip relative to matrix container
+            const gridRect = els.matrixGrid.getBoundingClientRect();
+            const pixelRect = pixel.getBoundingClientRect();
+            const left = pixelRect.left - gridRect.left + (pixelRect.width / 2) - 35;
+            const top = pixelRect.top - gridRect.top - 28;
+            els.matrixTooltip.style.left = `${left}px`;
+            els.matrixTooltip.style.top = `${top}px`;
+
+            // If mouse is down & Paint mode enabled, paint this pixel
+            if (state.isMouseDown && state.paintMode) {
+                paintPixel(idx, getActiveColor());
+            }
+        }
+    });
+
+    els.matrixGrid.addEventListener('mouseleave', () => {
+        els.matrixTooltip.classList.remove('visible');
+    });
+
+    // Tool Buttons
+    els.toolPaint.addEventListener('click', () => {
+        state.paintMode = !state.paintMode;
+        if (state.paintMode) {
+            els.toolPaint.classList.add('active');
+            logConsole("[SYS] Paint Mode ON: Click & drag to draw on matrix", "system-log");
+        } else {
+            els.toolPaint.classList.remove('active');
+            logConsole("[SYS] Paint Mode OFF", "system-log");
+        }
+    });
+
+    els.toolFillAll.addEventListener('click', () => {
+        const color = getActiveColor();
+        for (let i = 0; i < TOTAL_PIXELS; i++) {
+            state.matrix[i] = { ...color };
+            updatePixelDOM(i);
+        }
+        logConsole(`[SYS] Filled all 256 LEDs with rgb(${color.r},${color.g},${color.b})`, "system-log");
+        state.selectedIndex = TOTAL_PIXELS;
+        updatePreviewLens(color.r, color.g, color.b);
+        sendUpdateNow();
+    });
+
+    els.toolClearAll.addEventListener('click', () => {
+        for (let i = 0; i < TOTAL_PIXELS; i++) {
+            state.matrix[i] = { r: 0, g: 0, b: 0 };
+            updatePixelDOM(i);
+        }
+        logConsole("[SYS] Cleared matrix grid (All LEDs OFF)", "system-log");
+        state.selectedIndex = TOTAL_PIXELS;
+        updatePreviewLens(0, 0, 0);
+        sendUpdateNow();
+    });
+
+    // Sliders Input
+    const handleSliderInput = () => {
+        const r = parseInt(els.sliderR.value);
+        const g = parseInt(els.sliderG.value);
+        const b = parseInt(els.sliderB.value);
+
         if (state.rainbow) {
             state.rainbow = false;
             els.rainbowToggle.classList.remove('active');
-            document.getElementById('mode-badge').textContent = 'Static';
+            document.getElementById('mode-badge').textContent = 'Single LED';
         }
 
+        // Apply to current pixel
+        state.matrix[state.selectedIndex] = { r, g, b };
+        updatePixelDOM(state.selectedIndex);
         updateUIValuesOnly();
         debouncedSendUpdate();
     };
@@ -90,56 +191,50 @@ function setupEventListeners() {
             els.rainbowToggle.classList.add('active');
             els.slidersPanel.classList.add('disabled');
             document.getElementById('mode-badge').textContent = 'Rainbow';
-            logConsole("[SYS] Rainbow mode enabled (automatic cycling)", "system-log");
+            logConsole("[SYS] Rainbow mode enabled", "system-log");
         } else {
             els.rainbowToggle.classList.remove('active');
             els.slidersPanel.classList.remove('disabled');
-            document.getElementById('mode-badge').textContent = 'Static';
-            logConsole("[SYS] Static color mode restored", "system-log");
+            document.getElementById('mode-badge').textContent = 'Single LED';
+            logConsole("[SYS] Single LED color mode restored", "system-log");
         }
         updateUI();
         sendUpdateNow();
     });
 
-    // Preset Buttons
+    // Color Presets
     els.presetBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
-            // Determine clicked element's target color
             const targetBtn = e.target.closest('.preset-btn');
             const hex = targetBtn.getAttribute('data-color');
             const rgb = hexToRgb(hex);
 
             if (rgb) {
-                state.r = rgb.r;
-                state.g = rgb.g;
-                state.b = rgb.b;
+                state.matrix[state.selectedIndex] = { ...rgb };
                 state.rainbow = false;
 
-                // Update slider values
                 els.sliderR.value = rgb.r;
                 els.sliderG.value = rgb.g;
                 els.sliderB.value = rgb.b;
 
                 els.rainbowToggle.classList.remove('active');
                 els.slidersPanel.classList.remove('disabled');
-                document.getElementById('mode-badge').textContent = 'Static';
+                document.getElementById('mode-badge').textContent = 'Single LED';
 
-                logConsole(`[SYS] Preset selected: ${targetBtn.textContent.trim()} (${hex})`, "system-log");
-
+                updatePixelDOM(state.selectedIndex);
                 updateUI();
+                logConsole(`[SYS] Preset applied to LED #${state.selectedIndex}: ${targetBtn.textContent.trim()} (${hex})`, "system-log");
                 sendUpdateNow();
             }
         });
     });
 
-    // Color Picker Input
+    // Color Picker
     els.colorPicker.addEventListener('input', (e) => {
         const hex = e.target.value;
         const rgb = hexToRgb(hex);
         if (rgb) {
-            state.r = rgb.r;
-            state.g = rgb.g;
-            state.b = rgb.b;
+            state.matrix[state.selectedIndex] = { ...rgb };
             state.rainbow = false;
 
             els.sliderR.value = rgb.r;
@@ -148,8 +243,8 @@ function setupEventListeners() {
 
             els.rainbowToggle.classList.remove('active');
             els.slidersPanel.classList.remove('disabled');
-            document.getElementById('mode-badge').textContent = 'Static';
 
+            updatePixelDOM(state.selectedIndex);
             updateUIValuesOnly();
             debouncedSendUpdate();
         }
@@ -166,15 +261,78 @@ function setupEventListeners() {
     });
 }
 
-// Check if running on ESP32 or locally
+// Select a Pixel in the Matrix
+function selectPixel(index) {
+    state.selectedIndex = index;
+    const pixels = els.matrixGrid.children;
+
+    for (let i = 0; i < pixels.length; i++) {
+        if (i === index) {
+            pixels[i].classList.add('selected');
+        } else {
+            pixels[i].classList.remove('selected');
+        }
+    }
+
+    const row = Math.floor(index / MATRIX_SIZE);
+    const col = index % MATRIX_SIZE;
+    els.selectedPixelLabel.textContent = `LED #${index} (R${row}, C${col})`;
+    els.selectedLedTitle.textContent = `Active LED #${index}`;
+
+    // Load active pixel's color into controls
+    const curColor = state.matrix[index];
+    els.sliderR.value = curColor.r;
+    els.sliderG.value = curColor.g;
+    els.sliderB.value = curColor.b;
+
+    updateUI();
+}
+
+// Paint Pixel with Color
+function paintPixel(index, color) {
+    state.matrix[index] = { ...color };
+    updatePixelDOM(index);
+    if (index === state.selectedIndex) {
+        updateUI();
+    }
+    debouncedSendUpdate();
+}
+
+// Update Single Pixel DOM styling
+function updatePixelDOM(index) {
+    const pixel = els.matrixGrid.children[index];
+    if (!pixel) return;
+
+    const { r, g, b } = state.matrix[index];
+    const colorStr = `rgb(${r}, ${g}, ${b})`;
+
+    if (r === 0 && g === 0 && b === 0) {
+        pixel.style.removeProperty('--pixel-bg');
+        pixel.style.removeProperty('--pixel-color');
+        pixel.classList.remove('pixel-on');
+    } else {
+        pixel.style.setProperty('--pixel-bg', colorStr);
+        pixel.style.setProperty('--pixel-color', colorStr);
+        pixel.classList.add('pixel-on');
+    }
+}
+
+// Active Color helper
+function getActiveColor() {
+    return {
+        r: parseInt(els.sliderR.value),
+        g: parseInt(els.sliderG.value),
+        b: parseInt(els.sliderB.value)
+    };
+}
+
+// Network Connection Check
 function checkInitialConnection() {
-    // If hosted on file:// protocol, automatically run in Simulating/Mock Mode
     if (window.location.protocol === 'file:') {
         setSimulationMode(true, "Local File (Simulation)");
         return;
     }
 
-    // Try a ping check or handshake to check server availability
     fetch('/api/led')
         .then(res => {
             if (res.ok) {
@@ -184,12 +342,12 @@ function checkInitialConnection() {
                 throw new Error("HTTP connection check failed");
             }
         })
-        .catch(err => {
+        .catch(() => {
             if (CONFIG.autoSimulationFallback) {
                 setSimulationMode(true, "Offline (Simulation)");
                 logConsole("[SYS] ESP32 not reachable. Fallback to Simulation Mode.", "system-log");
             } else {
-                setSimulationMode(false, "Error / Disconnected");
+                setSimulationMode(false, "Disconnected");
                 logConsole("[ERR] Failed to reach ESP32 endpoint", "api-error");
             }
         });
@@ -200,63 +358,48 @@ function setSimulationMode(isSimulating, statusText) {
     els.statusText.textContent = statusText;
 
     if (isSimulating) {
-        els.statusDot.style.backgroundColor = '#eab308'; // Yellow
-        els.statusDot.style.boxShadow = '0 0 10px #eab308';
-        els.connectionStatus.title = "Operating in local simulation mode. API requests are mocked.";
+        els.statusDot.style.backgroundColor = '#eab308';
+        els.statusDot.style.boxShadow = '0 0 8px #eab308';
     } else {
-        els.statusDot.style.backgroundColor = '#2ad074'; // Green
-        els.statusDot.style.boxShadow = '0 0 10px #2ad074';
-        els.connectionStatus.title = "Connected to ESP32 device.";
+        els.statusDot.style.backgroundColor = '#2ad074';
+        els.statusDot.style.boxShadow = '0 0 8px #2ad074';
     }
 }
 
 // UI Rendering Utilities
 function updateUI() {
-    // Sync slider texts
-    els.valR.textContent = state.r;
-    els.valG.textContent = state.g;
-    els.valB.textContent = state.b;
+    const curColor = state.matrix[state.selectedIndex];
+    els.valR.textContent = curColor.r;
+    els.valG.textContent = curColor.g;
+    els.valB.textContent = curColor.b;
 
-    // Sync picker input value
-    els.colorPicker.value = rgbToHex(state.r, state.g, state.b);
+    els.colorPicker.value = rgbToHex(curColor.r, curColor.g, curColor.b);
+    els.rgbText.textContent = `rgb(${curColor.r}, ${curColor.g}, ${curColor.b})`;
+    els.hexText.textContent = rgbToHex(curColor.r, curColor.g, curColor.b).toUpperCase();
 
-    // Sync labels
-    els.rgbText.textContent = `rgb(${state.r}, ${state.g}, ${state.b})`;
-    els.hexText.textContent = rgbToHex(state.r, state.g, state.b).toUpperCase();
+    updatePreviewLens(curColor.r, curColor.g, curColor.b);
+}
 
-    // Render Preview LED state
+function updateUIValuesOnly() {
+    const curColor = state.matrix[state.selectedIndex];
+    els.valR.textContent = curColor.r;
+    els.valG.textContent = curColor.g;
+    els.valB.textContent = curColor.b;
+
+    els.colorPicker.value = rgbToHex(curColor.r, curColor.g, curColor.b);
+    els.rgbText.textContent = `rgb(${curColor.r}, ${curColor.g}, ${curColor.b})`;
+    els.hexText.textContent = rgbToHex(curColor.r, curColor.g, curColor.b).toUpperCase();
+
+    updatePreviewLens(curColor.r, curColor.g, curColor.b);
+}
+
+function updatePreviewLens(r, g, b) {
     if (state.rainbow) {
         els.ledLens.className = 'led-lens led-rainbow';
         els.ledHalo.className = 'led-halo led-rainbow';
-        els.ledHalo.style.removeProperty('--led-color');
     } else {
-        els.ledLens.className = 'led-lens led-active';
-        els.ledHalo.className = 'led-halo led-active';
-
-        const colorStr = `rgb(${state.r}, ${state.g}, ${state.b})`;
-        // If LED is off, don't glow
-        if (state.r === 0 && state.g === 0 && state.b === 0) {
-            els.ledLens.classList.remove('led-active');
-            els.ledHalo.classList.remove('led-active');
-        } else {
-            els.ledLens.style.setProperty('--led-color', colorStr);
-            els.ledHalo.style.setProperty('--led-color', colorStr);
-        }
-    }
-}
-
-// Update UI values without full redraw of heavy CSS bindings
-function updateUIValuesOnly() {
-    els.valR.textContent = state.r;
-    els.valG.textContent = state.g;
-    els.valB.textContent = state.b;
-    els.colorPicker.value = rgbToHex(state.r, state.g, state.b);
-    els.rgbText.textContent = `rgb(${state.r}, ${state.g}, ${state.b})`;
-    els.hexText.textContent = rgbToHex(state.r, state.g, state.b).toUpperCase();
-
-    if (!state.rainbow) {
-        const colorStr = `rgb(${state.r}, ${state.g}, ${state.b})`;
-        if (state.r === 0 && state.g === 0 && state.b === 0) {
+        const colorStr = `rgb(${r}, ${g}, ${b})`;
+        if (r === 0 && g === 0 && b === 0) {
             els.ledLens.className = 'led-lens';
             els.ledHalo.className = 'led-halo';
         } else {
@@ -268,7 +411,7 @@ function updateUIValuesOnly() {
     }
 }
 
-// Debounce controller to prevent network bottleneck
+// Debounced Network Updates
 function debouncedSendUpdate() {
     const now = Date.now();
     const elapsed = now - state.lastSentTimestamp;
@@ -280,66 +423,47 @@ function debouncedSendUpdate() {
     if (elapsed >= CONFIG.debounceDelay) {
         sendUpdateNow();
     } else {
-        // Schedule final update when time is up
         state.pendingUpdateTimeout = setTimeout(() => {
             sendUpdateNow();
         }, CONFIG.debounceDelay - elapsed);
     }
 }
 
-// Send actual network command
 function sendUpdateNow() {
     state.lastSentTimestamp = Date.now();
+    const curColor = state.matrix[state.selectedIndex];
 
-    // Prepare API URL and parameters
-    let url = CONFIG.apiEndpoint;
-    let requestOptions = {
-        method: CONFIG.apiMethod,
-        headers: {}
+    const bodyData = {
+        r: curColor.r,
+        g: curColor.g,
+        b: curColor.b,
+        index: state.selectedIndex,
+        rainbow: state.rainbow
     };
 
-    const isRainbowVal = state.rainbow ? 1 : 0;
+    const requestOptions = {
+        method: CONFIG.apiMethod,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyData)
+    };
 
-    if (CONFIG.apiMode === 'query') {
-        url += `?r=${state.r}&g=${state.g}&b=${state.b}&rainbow=${isRainbowVal}`;
-    } else {
-        requestOptions.headers['Content-Type'] = 'application/json';
-        requestOptions.body = JSON.stringify({
-            r: state.r,
-            g: state.g,
-            b: state.b,
-            rainbow: state.rainbow
-        });
-    }
+    logConsole(`[API] POST ${CONFIG.apiEndpoint} ${JSON.stringify(bodyData)}`, "api-request");
 
-    const logParamStr = CONFIG.apiMode === 'query'
-        ? `?r=${state.r}&g=${state.g}&b=${state.b}&rainbow=${isRainbowVal}`
-        : JSON.stringify({ r: state.r, g: state.g, b: state.b, rainbow: state.rainbow });
-
-    logConsole(`[API] ${CONFIG.apiMethod} ${CONFIG.apiEndpoint}${CONFIG.apiMode === 'query' ? logParamStr : ''}`, "api-request");
-
-    // Execution
     if (state.isSimulating) {
-        // Local simulation delay
         setTimeout(() => {
-            logConsole(`[SYS] MOCK RESPONSE: LED successfully updated.`, "api-success");
-        }, 30);
+            logConsole(`[SYS] MOCK RESPONSE: LED #${state.selectedIndex} updated.`, "api-success");
+        }, 20);
     } else {
-        fetch(url, requestOptions)
+        fetch(CONFIG.apiEndpoint, requestOptions)
             .then(res => {
                 if (res.ok) {
-                    logConsole(`[API] 200 OK - LED Updated.`, "api-success");
+                    logConsole(`[API] 200 OK - LED #${state.selectedIndex} updated.`, "api-success");
                 } else {
                     logConsole(`[ERR] ${res.status} ${res.statusText} - LED update failed.`, "api-error");
                 }
             })
             .catch(err => {
                 logConsole(`[ERR] Connection error: ${err.message}`, "api-error");
-                // If real connection fails, fallback to simulation so page stays interactive
-                if (CONFIG.autoSimulationFallback && !state.isSimulating) {
-                    setSimulationMode(true, "Fallback (Simulating)");
-                    logConsole("[SYS] Disconnection detected. Switched to Simulation.", "system-log");
-                }
             });
     }
 }
@@ -349,23 +473,19 @@ function logConsole(msg, typeClass = '') {
     const logLine = document.createElement('div');
     logLine.className = `log-line ${typeClass}`;
 
-    // Add Timestamp
     const d = new Date();
     const timeStr = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}.${(d.getMilliseconds() / 10).toFixed(0).padStart(2, '0')}`;
 
     logLine.textContent = `[${timeStr}] ${msg}`;
     els.consoleLogs.appendChild(logLine);
-
-    // Auto-scroll
     els.consoleLogs.scrollTop = els.consoleLogs.scrollHeight;
 
-    // Keep max 40 log entries to save device DOM memory
     if (els.consoleLogs.childNodes.length > 40) {
         els.consoleLogs.removeChild(els.consoleLogs.firstChild);
     }
 }
 
-// Color conversion helpers
+// Color Conversion Helpers
 function hexToRgb(hex) {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? {
