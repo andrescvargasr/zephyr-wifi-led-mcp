@@ -56,23 +56,6 @@
 // Include external utils
 #include "net_sample_common.h"
 
-// Threads
-#ifdef THD_LED
-#include "thd_led.h"
-#define THD_LED_STACKSIZE 512
-#define THD_LED_PRIORITY K_PRIO_PREEMPT(2)
-#define THD_LED_DELAY_MS 10 // ms
-static struct k_thread thd_led_data;
-
-// #if defined(CONFIG_ESP_SPIRAM)
-// static Z_KERNEL_STACK_DEFINE_IN(thd_led_stack, THD_LED_STACKSIZE, __attribute__((section(".ext_ram.bss"))));
-// #else
-// static Z_KERNEL_STACK_DEFINE_IN(thd_led_stack, THD_LED_STACKSIZE, __attribute__((section(".sram.bss"))));
-K_THREAD_STACK_DEFINE(thd_led_stack, THD_LED_STACKSIZE);
-// #endif // CONFIG_ESP_SPIRAM
-
-#endif // THD_LED
-
 LOG_MODULE_REGISTER(wifi_test, LOG_LEVEL_INF);
 
 // HTTP Server
@@ -290,21 +273,6 @@ int main(void)
 #else
 	LOG_WRN("PSRAM not available");
 #endif
-
-/*******************************************************************************
- *  THREADS INITIALIZATION                                                     *
- ******************************************************************************/
-#ifdef THD_LED
-	k_tid_t my_tid = k_thread_create(&thd_led_data, thd_led_stack,
-			K_THREAD_STACK_SIZEOF(thd_led_stack),
-			thread_led,
-			NULL, NULL, NULL,
-			THD_LED_PRIORITY, 0, K_MSEC(0 * THD_LED_DELAY_MS));
-
-	if (my_tid == NULL) {
-		LOG_ERR("Failed to create LED thread");
-	}
-#endif // End THD_LED
 
 	LOG_INF("Starting Wi-Fi MCP LED Server application...");
 

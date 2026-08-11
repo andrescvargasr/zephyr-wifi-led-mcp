@@ -25,13 +25,8 @@
 
 LOG_MODULE_REGISTER(mcp_app_server, LOG_LEVEL_INF);
 
-// #if defined(CONFIG_ESP_SPIRAM)
-// __attribute__ ((section (".ext_ram.bss"))) mcp_server_ctx_t server;
-// __attribute__ ((section (".ext_ram.bss"))) static bool led_initialized;
-// #else
 mcp_server_ctx_t server;
 static bool led_initialized;
-// #endif // CONFIG_ESP_SPIRAM
 
 struct mcp_led_args {
 	int32_t r;
