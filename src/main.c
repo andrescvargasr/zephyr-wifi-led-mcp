@@ -142,7 +142,15 @@ static void parse_led_post(uint8_t *buf, size_t len)
 		return;
 	}
 
-	LOG_DBG("POST request setting LED to state r: %d, g: %d, b: %d, rainbow: %s", cmd.r, cmd.g, cmd.b, cmd.rainbow ? "true" : "false");
+	LOG_DBG("POST request setting LED to state r: %d, g: %d, b: %d, index: %d, rainbow: %s", cmd.r, cmd.g, cmd.b, cmd.index, cmd.rainbow ? "true" : "false");
+
+	// If r,g,b is greater than CONFIG_WHITE_LED_BRIGHTNESS to built white color, clamp it
+	uint8_t brightness = CONFIG_WHITE_LED_BRIGHTNESS;
+	if (cmd.r > brightness && cmd.g > brightness && cmd.b > brightness) {
+		cmd.r = brightness;
+		cmd.g = brightness;
+		cmd.b = brightness;
+	}
 
 	struct led_msg msg = {
 		.action = LED_ACTION_CUSTOM,

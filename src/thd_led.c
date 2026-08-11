@@ -10,6 +10,8 @@
  * SPDX-License-Identifier: MIT
  */
 
+// TODO: Replace STRIP_NUM_PIXELS for CONFIG_LED_MATRIX_PIXELS
+
 #include <errno.h>
 #include <string.h>
 
@@ -126,11 +128,11 @@ int led_set(uint8_t r, uint8_t g, uint8_t b, uint16_t index)
 
 	// Check if the index is equal to number of pixels
 	if (index == CONFIG_LED_MATRIX_PIXELS) {
-	for (size_t i = 0; i < STRIP_NUM_PIXELS; i++) {
-		pixels[i].r = r;
-		pixels[i].g = g;
-		pixels[i].b = b;
-	}
+		for (size_t i = 0; i < STRIP_NUM_PIXELS; i++) {
+			pixels[i].r = r;
+			pixels[i].g = g;
+			pixels[i].b = b;
+		}
 	} else {
 		pixels[index].r = r;
 		pixels[index].g = g;

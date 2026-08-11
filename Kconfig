@@ -29,8 +29,10 @@ config LED_MATRIX_PIXELS
 	range 1 65536
 	help
 	  Number of pixels in the LED matrix.
+
+config WHITE_LED_BRIGHTNESS
 	int "LED brightness"
-	default 5
+	default 25
 	range 1 255
 	help
 	  Brightness level of each LED. Defaults to a low value to make
