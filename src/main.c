@@ -64,11 +64,12 @@
 #define THD_LED_DELAY_MS 10 // ms
 static struct k_thread thd_led_data;
 
-#if defined(CONFIG_ESP_SPIRAM)
-static Z_KERNEL_STACK_DEFINE_IN(thd_led_stack, THD_LED_STACKSIZE, __attribute__((section(".ext_ram.bss"))));
-#else
-static Z_KERNEL_STACK_DEFINE_IN(thd_led_stack, THD_LED_STACKSIZE, __attribute__((section(".sram.bss"))));
-#endif // CONFIG_ESP_SPIRAM
+// #if defined(CONFIG_ESP_SPIRAM)
+// static Z_KERNEL_STACK_DEFINE_IN(thd_led_stack, THD_LED_STACKSIZE, __attribute__((section(".ext_ram.bss"))));
+// #else
+// static Z_KERNEL_STACK_DEFINE_IN(thd_led_stack, THD_LED_STACKSIZE, __attribute__((section(".sram.bss"))));
+K_THREAD_STACK_DEFINE(thd_led_stack, THD_LED_STACKSIZE);
+// #endif // CONFIG_ESP_SPIRAM
 
 #endif // THD_LED
 
