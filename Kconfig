@@ -31,7 +31,15 @@ config LED_MATRIX_PIXELS
 	  Number of pixels in the LED matrix.
 
 config WHITE_LED_BRIGHTNESS
-	int "LED brightness"
+	int "White LED brightness"
+	default 25
+	range 1 255
+	help
+	  Brightness level of the white LED settings (all RGB on). Defaults to a low value to avoid blinding
+	  the user and issue with the power supply, due to the WS2812 LEDs draw more current when all are on.
+
+config DEFAULT_LED_BRIGHTNESS
+	int "Default LED brightness"
 	default 25
 	range 1 255
 	help

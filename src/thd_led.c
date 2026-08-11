@@ -93,9 +93,9 @@ static void hsv_to_rgb(uint16_t h, uint8_t *r, uint8_t *g, uint8_t *b)
 	case 5:
 	default: rf = 1; gf = p; bf = q; break;
 	}
-	*r = (uint8_t)(rf * CONFIG_SAMPLE_LED_BRIGHTNESS);
-	*g = (uint8_t)(gf * CONFIG_SAMPLE_LED_BRIGHTNESS);
-	*b = (uint8_t)(bf * CONFIG_SAMPLE_LED_BRIGHTNESS);
+	*r = (uint8_t)(rf * CONFIG_DEFAULT_LED_BRIGHTNESS);
+	*g = (uint8_t)(gf * CONFIG_DEFAULT_LED_BRIGHTNESS);
+	*b = (uint8_t)(bf * CONFIG_DEFAULT_LED_BRIGHTNESS);
 }
 
 int led_is_ready(void)
@@ -188,7 +188,7 @@ void thread_led(void *p1, void *p2, void *p3)
 					break;
 				case LED_ACTION_RED:
 					mode = LED_MODE_SOLID;
-					solid_r = CONFIG_SAMPLE_LED_BRIGHTNESS;
+					solid_r = CONFIG_DEFAULT_LED_BRIGHTNESS;
 					solid_g = 0;
 					solid_b = 0;
 					led_set(solid_r, solid_g, solid_b, msg.index);
@@ -196,7 +196,7 @@ void thread_led(void *p1, void *p2, void *p3)
 				case LED_ACTION_GREEN:
 					mode = LED_MODE_SOLID;
 					solid_r = 0;
-					solid_g = CONFIG_SAMPLE_LED_BRIGHTNESS;
+					solid_g = CONFIG_DEFAULT_LED_BRIGHTNESS;
 					solid_b = 0;
 					led_set(solid_r, solid_g, solid_b, msg.index);
 					break;
@@ -204,7 +204,7 @@ void thread_led(void *p1, void *p2, void *p3)
 					mode = LED_MODE_SOLID;
 					solid_r = 0;
 					solid_g = 0;
-					solid_b = CONFIG_SAMPLE_LED_BRIGHTNESS;
+					solid_b = CONFIG_DEFAULT_LED_BRIGHTNESS;
 					led_set(solid_r, solid_g, solid_b, msg.index);
 					break;
 				case LED_ACTION_CUSTOM:
