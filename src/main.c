@@ -64,6 +64,7 @@ struct led_command {
     uint32_t r;
     uint32_t g;
     uint32_t b;
+	uint32_t index;
     bool rainbow;
 };
 
@@ -71,6 +72,7 @@ static const struct json_obj_descr led_command_descr[] = {
 	JSON_OBJ_DESCR_PRIM(struct led_command, r, JSON_TOK_NUMBER),
 	JSON_OBJ_DESCR_PRIM(struct led_command, g, JSON_TOK_NUMBER),
 	JSON_OBJ_DESCR_PRIM(struct led_command, b, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct led_command, index, JSON_TOK_NUMBER),
 	JSON_OBJ_DESCR_PRIM(struct led_command, rainbow, JSON_TOK_TRUE),
 };
 
@@ -147,6 +149,7 @@ static void parse_led_post(uint8_t *buf, size_t len)
 		.r = (uint8_t)CLAMP(cmd.r, 0, 255),
 		.g = (uint8_t)CLAMP(cmd.g, 0, 255),
 		.b = (uint8_t)CLAMP(cmd.b, 0, 255),
+		.index = (uint16_t)CLAMP(cmd.index, 0, CONFIG_LED_MATRIX_PIXELS),
 		.rainbow = cmd.rainbow
 	};
 

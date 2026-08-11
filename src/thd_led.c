@@ -55,7 +55,7 @@ ZBUS_CHAN_DEFINE(led_chan,
 		 NULL,
 		 NULL,
 		 ZBUS_OBSERVERS(led_sub),
-		 ZBUS_MSG_INIT(.action = LED_ACTION_ON, .r = 0, .g = 0, .b = 0, .rainbow = true)
+		 ZBUS_MSG_INIT(.action = LED_ACTION_ON, .r = 0, .g = 0, .b = 0, .index = 0, .rainbow = true)
 );
 
 ZBUS_CHAN_DEFINE(led_ready_chan,
@@ -118,16 +118,25 @@ int led_is_ready(void)
 	return ready_msg.status;
 }
 
-int led_set(uint8_t r, uint8_t g, uint8_t b)
+int led_set(uint8_t r, uint8_t g, uint8_t b, uint16_t index)
 {
 	int rc;
 
 	memset(&pixels, 0x00, sizeof(pixels));
+
+	// Check if the index is equal to number of pixels
+	if (index == CONFIG_LED_MATRIX_PIXELS) {
 	for (size_t i = 0; i < STRIP_NUM_PIXELS; i++) {
 		pixels[i].r = r;
 		pixels[i].g = g;
 		pixels[i].b = b;
 	}
+	} else {
+		pixels[index].r = r;
+		pixels[index].g = g;
+		pixels[index].b = b;
+	}
+
 
 	rc = led_strip_update_rgb(strip, pixels, STRIP_NUM_PIXELS);
 	if (rc) {
@@ -158,11 +167,11 @@ void thread_led(void *p1, void *p2, void *p3)
 		rc = zbus_sub_wait(&led_sub, &chan, DELAY_TIME);
 		if (rc == 0) {
 			if (zbus_chan_read(chan, &msg, K_NO_WAIT) == 0) {
-				LOG_INF("Zbus received action: %d", msg.action);
+				LOG_INF("Zbus received action: %d, index: %d", msg.action, msg.index);
 				switch (msg.action) {
 				case LED_ACTION_OFF:
 					mode = LED_MODE_OFF;
-					led_set(0, 0, 0);
+					led_set(0, 0, 0, msg.index);
 					break;
 				case LED_ACTION_ON:
 					mode = LED_MODE_RAINBOW;
@@ -172,7 +181,7 @@ void thread_led(void *p1, void *p2, void *p3)
 						mode = LED_MODE_RAINBOW;
 					} else {
 						mode = LED_MODE_OFF;
-						led_set(0, 0, 0);
+						led_set(0, 0, 0, msg.index);
 					}
 					break;
 				case LED_ACTION_RED:
@@ -180,21 +189,21 @@ void thread_led(void *p1, void *p2, void *p3)
 					solid_r = CONFIG_SAMPLE_LED_BRIGHTNESS;
 					solid_g = 0;
 					solid_b = 0;
-					led_set(solid_r, solid_g, solid_b);
+					led_set(solid_r, solid_g, solid_b, msg.index);
 					break;
 				case LED_ACTION_GREEN:
 					mode = LED_MODE_SOLID;
 					solid_r = 0;
 					solid_g = CONFIG_SAMPLE_LED_BRIGHTNESS;
 					solid_b = 0;
-					led_set(solid_r, solid_g, solid_b);
+					led_set(solid_r, solid_g, solid_b, msg.index);
 					break;
 				case LED_ACTION_BLUE:
 					mode = LED_MODE_SOLID;
 					solid_r = 0;
 					solid_g = 0;
 					solid_b = CONFIG_SAMPLE_LED_BRIGHTNESS;
-					led_set(solid_r, solid_g, solid_b);
+					led_set(solid_r, solid_g, solid_b, msg.index);
 					break;
 				case LED_ACTION_CUSTOM:
 					if (msg.rainbow) {
@@ -204,7 +213,7 @@ void thread_led(void *p1, void *p2, void *p3)
 						solid_r = msg.r;
 						solid_g = msg.g;
 						solid_b = msg.b;
-						led_set(solid_r, solid_g, solid_b);
+						led_set(solid_r, solid_g, solid_b, msg.index);
 					}
 					break;
 				}
@@ -214,11 +223,11 @@ void thread_led(void *p1, void *p2, void *p3)
 			if (mode == LED_MODE_RAINBOW) {
 				hsv_to_rgb(hue, &red, &green, &blue);
 				hue = (hue + 1) % 360;
-				led_set(red, green, blue);
+				led_set(red, green, blue, msg.index);
 			} else if (mode == LED_MODE_SOLID) {
-				led_set(solid_r, solid_g, solid_b);
+				led_set(solid_r, solid_g, solid_b, msg.index);
 			} else if (mode == LED_MODE_OFF) {
-				led_set(0, 0, 0);
+				led_set(0, 0, 0, msg.index);
 			}
 		}
 	}

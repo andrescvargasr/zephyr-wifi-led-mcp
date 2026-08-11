@@ -9,7 +9,26 @@ config SAMPLE_LED_UPDATE_DELAY
 	help
 	  Delay between LED updates in ms.
 
-config SAMPLE_LED_BRIGHTNESS
+config LED_MATRIX_WIDTH
+	int "Width of the LED matrix"
+	default 16
+	range 1 255
+	help
+	  Width of the LED matrix.
+
+config LED_MATRIX_HEIGHT
+	int "Height of the LED matrix"
+	default 16
+	range 1 255
+	help
+	  Height of the LED matrix.
+
+config LED_MATRIX_PIXELS
+	int "Number of pixels in the LED matrix"
+	default 256
+	range 1 65536
+	help
+	  Number of pixels in the LED matrix.
 	int "LED brightness"
 	default 5
 	range 1 255
