@@ -57,7 +57,7 @@ ZBUS_CHAN_DEFINE(led_chan,
 		 NULL,
 		 NULL,
 		 ZBUS_OBSERVERS(led_sub),
-		 ZBUS_MSG_INIT(.action = LED_ACTION_ON, .r = 0, .g = 0, .b = 0, .index = 0, .rainbow = true)
+		 ZBUS_MSG_INIT(.action = LED_ACTION_ON, .r = 0, .g = 0, .b = 0, .index = CONFIG_LED_MATRIX_PIXELS, .rainbow = true)
 );
 
 ZBUS_CHAN_DEFINE(led_ready_chan,
@@ -124,7 +124,7 @@ int led_set(uint8_t r, uint8_t g, uint8_t b, uint16_t index)
 {
 	int rc;
 
-	memset(&pixels, 0x00, sizeof(pixels));
+	// memset(&pixels, 0x00, sizeof(pixels));
 
 	// Check if the index is equal to number of pixels
 	if (index == CONFIG_LED_MATRIX_PIXELS) {
@@ -164,6 +164,8 @@ void thread_led(void *p1, void *p2, void *p3)
 	uint8_t solid_r = 0, solid_g = 0, solid_b = 0;
 	uint8_t red = 0, green = 0, blue = 0;
 	uint16_t hue = 0;
+	
+	msg.index = CONFIG_LED_MATRIX_PIXELS;
 
 	while (1) {
 		rc = zbus_sub_wait(&led_sub, &chan, DELAY_TIME);
