@@ -10,8 +10,6 @@
  * SPDX-License-Identifier: MIT
  */
 
-// TODO: Replace STRIP_NUM_PIXELS for CONFIG_LED_MATRIX_PIXELS
-
 #include <errno.h>
 #include <string.h>
 
@@ -22,21 +20,23 @@ LOG_MODULE_REGISTER(led_rgb);
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/led_strip.h>
 #include <zephyr/device.h>
-#include <zephyr/drivers/spi.h>
 #include <zephyr/sys/util.h>
-#include <zephyr/zbus/zbus.h>
 
 #include "led_zbus.h"
 
 #define STRIP_NODE		DT_ALIAS(led_strip)
 
 #if DT_NODE_HAS_PROP(DT_ALIAS(led_strip), chain_length)
-#define STRIP_NUM_PIXELS	DT_PROP(DT_ALIAS(led_strip), chain_length)
+	#if defined(CONFIG_BOARD_ESP32C5_DEVKITC)
+	#define STRIP_NUM_PIXELS	DT_PROP(STRIP_NODE, chain_length)
+	#else
+	#define STRIP_NUM_PIXELS	CONFIG_LED_MATRIX_PIXELS
+	#endif
 #else
 #error Unable to determine length of LED strip
 #endif
 
-#define DELAY_TIME K_MSEC(CONFIG_SAMPLE_LED_UPDATE_DELAY)
+#define DELAY_TIME K_MSEC(CONFIG_LED_UPDATE_DELAY)
 
 #define RGB(_r, _g, _b) { .r = (_r), .g = (_g), .b = (_b) }
 
@@ -45,7 +45,6 @@ __attribute__ ((section (".ext_ram.bss"))) static struct led_rgb pixels[STRIP_NU
 #else
 static struct led_rgb pixels[STRIP_NUM_PIXELS];
 #endif // CONFIG_ESP_SPIRAM
-
 
 static const struct device *const strip = DEVICE_DT_GET(STRIP_NODE);
 

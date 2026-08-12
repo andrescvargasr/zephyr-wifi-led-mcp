@@ -3,7 +3,7 @@
 
 menu "WS2812 Configuration"
 
-config SAMPLE_LED_UPDATE_DELAY
+config LED_UPDATE_DELAY
 	int "Delay between LED updates in ms"
 	default 50
 	help
@@ -32,7 +32,7 @@ config LED_MATRIX_PIXELS
 
 config WHITE_LED_BRIGHTNESS
 	int "White LED brightness"
-	default 25
+	default 15
 	range 1 255
 	help
 	  Brightness level of the white LED settings (all RGB on). Defaults to a low value to avoid blinding
@@ -40,7 +40,7 @@ config WHITE_LED_BRIGHTNESS
 
 config DEFAULT_LED_BRIGHTNESS
 	int "Default LED brightness"
-	default 25
+	default 15
 	range 1 255
 	help
 	  Brightness level of each LED. Defaults to a low value to make
