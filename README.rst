@@ -61,7 +61,6 @@ MCP Server Interface
 
 The application features an HTTP-based MCP server running on port 8080 (endpoint ``/mcp``) with hostname ``mcp-led``. The server exposes remote tools that can be invoked by MCP clients or AI assistants:
 
-- **``delayed_response``**: A test tool demonstrating asynchronous execution, SSE ping keep-alives, and cancellation support.
 - **``led_control``**: Enables remote control of the WS2812 RGB LED strip over Zbus (``led_chan``). Accepts actions (``on``, ``off``, ``toggle``, ``red``, ``green``, ``blue``), RGB values (``r``, ``g``, ``b``), target pixel ``index`` (to activate individual LEDs or all pixels), custom ``color`` strings (e.g. ``rgb(r,g,b)``), and ``rainbow`` boolean mode.
 
 Project Structure
@@ -79,8 +78,8 @@ Project Structure
 - ``include/params.h``: Shared application parameters and data structures.
 - ``include/thd_led.h``: Function prototypes for the LED thread module.
 - ``src/_start_threads.c``: Thread management boilerplate defining and launching system threads (e.g. ``thd_led``).
-- ``src/mcp_server.c``: MCP HTTP server implementation, registering tools (``delayed_response``, ``led_control``) and publishing Zbus messages.
-- ``src/thd_led.c``: WS2812 LED strip thread function implementing smooth HSV rainbow cycling and periodic logging (every 5 seconds).
+- ``src/mcp_server.c``: MCP HTTP server implementation, registering tools (``led_control``) and publishing Zbus messages.
+- ``src/thd_led.c``: WS2812 LED strip thread function implementing smooth HSV rainbow cycling and periodic logging (every 50 ms).
 - ``src/main.c``: Main application entry point, Wi-Fi auto-connect, ``wait_for_network()`` initialization, and MCP server startup.
 
 Requirements
@@ -107,9 +106,9 @@ Software & Host Environment
 Wiring
 ******
 
-Connect the WS2812 RGB LED strip to your development board according to the Devicetree assignments specified in ``app.overlay``:
+Connect the WS2812 RGB LED strip to your development board according to the Devicetree assignments specified in ``app.overlay`` or dedicated overlay file in ``boards/`` folder:
 
-* **Data Line (DIN):** Connected to the I2S/DMA data output pin defined in ``app.overlay``.
+* **Data Line (DIN):** Connected to the I2S/DMA data output pin defined in overlay file for current board.
 * **Power (VCC):** +5V or +3.3V (depending on LED strip specification).
 * **Ground (GND):** Common ground with the development board.
 
@@ -126,7 +125,7 @@ Activate the Python virtual environment before executing ``west`` commands:
    zvenv
    # or: source /home/user/zephyrproject/.venv/bin/activate
 
-Set Target Board Configuration
+Set Default Target Board Configuration
 ==============================
 
 .. code-block:: console
@@ -169,6 +168,8 @@ Build with Kconfig overlay (e.g. debug overlay):
 
 Build with Snippets
 ===================
+
+Note: The project already includes the snippets that we need (see ``CMakeLists.txt``).
 
 You can enable and test various snippets incrementally:
 
@@ -217,10 +218,10 @@ Flashing specifying serial/USB port:
    # Windows serial port
    west flash --esp-device COM17
 
-   # Linux USB native port (ESP32-C5)
+   # Linux USB native port (ESP32-C5 USB port, Xiao_ESP32-C5 and Xiao_ESP32-S3 default ports)
    west flash --esp-device /dev/ttyACM0
 
-   # Linux Serial-to-USB port (ESP32-C5)
+   # Linux Serial-to-USB port (ESP32-C5 UART port)
    west flash --esp-device /dev/ttyUSB0
 
 Serial Monitor
@@ -230,10 +231,10 @@ Launch the serial monitor to view system logs and interact with the Zephyr shell
 
 .. code-block:: console
 
-   # USB native port on Linux (ESP32-C5)
+   # USB native port on Linux
    west espressif monitor -p /dev/ttyACM0
 
-   # Serial-to-USB port on Linux (ESP32-C5)
+   # Serial-to-USB port on Linux
    west espressif monitor -p /dev/ttyUSB0
 
 Flash and Open Serial Monitor
@@ -243,10 +244,10 @@ Flash firmware and immediately launch the serial monitor in a single command:
 
 .. code-block:: console
 
-   # Serial-to-USB port on Linux (ESP32-C5)
+   # Serial-to-USB port on Linux
    west flash --esp-device /dev/ttyUSB0 && west espressif monitor -p /dev/ttyUSB0
 
-   # USB native port on Linux (ESP32-C5)
+   # USB native port on Linux
    west flash --esp-device /dev/ttyACM0 && west espressif monitor -p /dev/ttyACM0
 
 Discovering Device IP via mDNS (Avahi)
@@ -308,10 +309,10 @@ Sample Console Interaction
    Connected
    shell>
 
-Testing MCP Client with Python
+Testing MCP Client
 ==============================
 
-A Python test script is available in `test_mcp_python_code <https://github.com/andrescvargasr/test_mcp_python_code>`_ to test the connection and issue remote commands to the MCP HTTP server.
+A Python and Rust test scripts are available in `test_mcp_server_code <https://github.com/andrescvargasr/test_mcp_server_code>`_ to test the connection and issue remote commands to the MCP HTTP server.
 
 Connection Requirements
 -----------------------
@@ -403,7 +404,7 @@ Running the Script
 
 .. code-block:: console
 
-   cd /home/camilo/zephyrproject/projects/test_mcp_python_code
+   cd /home/camilo/zephyrproject/projects/test_mcp_server_code
 
    # Turn LED on / off / toggle
    python control_led.py on
@@ -414,6 +415,17 @@ Running the Script
    python control_led.py red
    python control_led.py green
    python control_led.py blue
+
+
+Running the Rust Executable
+-----------------------
+
+.. code-block:: console
+
+   ./rust/target/release/control_led on --mdns my-custom-led --port 9090
+   ./rust/target/release/control_led toggle --index 2
+   ./rust/target/release/control_led rainbow --index 2
+   ./rust/target/release/control_led --list-tools
 
 References
 **********
