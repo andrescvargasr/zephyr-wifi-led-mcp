@@ -62,7 +62,7 @@ MCP Server Interface
 The application features an HTTP-based MCP server running on port 8080 (endpoint ``/mcp``) with hostname ``mcp-led``. The server exposes remote tools that can be invoked by MCP clients or AI assistants:
 
 - **``delayed_response``**: A test tool demonstrating asynchronous execution, SSE ping keep-alives, and cancellation support.
-- **``led_control``**: Enables remote control of the WS2812 RGB LED strip over Zbus (``led_chan``). Accepts actions: ``on``, ``off``, ``toggle``, ``red``, ``green``, and ``blue``.
+- **``led_control``**: Enables remote control of the WS2812 RGB LED strip over Zbus (``led_chan``). Accepts actions (``on``, ``off``, ``toggle``, ``red``, ``green``, ``blue``), RGB values (``r``, ``g``, ``b``), target pixel ``index`` (to activate individual LEDs or all pixels), custom ``color`` strings (e.g. ``rgb(r,g,b)``), and ``rainbow`` boolean mode.
 
 Project Structure
 =================

@@ -68,7 +68,7 @@ zephyr-wifi-led-mcp/
 - **Main Application Module (`src/main.c`):** Triggers `auto_connect()` via NVS credentials, waits for IP assignment via `wait_for_network()`, and launches the MCP server, HTTP server, and mDNS responder.
 - **MCP HTTP Server & Zbus (`src/mcp_server.c`, `include/mcp_server.h`, `include/led_zbus.h`):** Runs an HTTP MCP server listening on port 8080 (`/mcp` endpoint) under hostname `mcp-led`. Registers MCP tools:
   - `delayed_response`: Asynchronous tool for SSE ping keep-alive and cancellation testing.
-  - `led_control`: Remote LED command tool publishing to Zbus channel `led_chan` (`on`, `off`, `toggle`, `red`, `green`, `blue`).
+  - `led_control`: Remote LED command tool publishing to Zbus channel `led_chan`. Accepts actions (`on`, `off`, `toggle`, `red`, `green`, `blue`), RGB parameters (`r`, `g`, `b`), target pixel `index`, custom `color` string, or `rainbow` mode.
 - **PSRAM Size Output:** Queries and prints detected PSRAM size on startup using `esp_psram_get_size()` or Devicetree properties.
 
 ### Default Snippets (`CMakeLists.txt`)
