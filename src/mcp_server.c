@@ -17,7 +17,6 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net/mcp/mcp_server.h>
 #include <zephyr/net/mcp/mcp_server_http.h>
-#include <zephyr/zbus/zbus.h>
 #include <zephyr/data/json.h>
 #include <zephyr/sys/util.h>
 
@@ -32,6 +31,7 @@ struct mcp_led_args {
 	int32_t r;
 	int32_t g;
 	int32_t b;
+	int32_t index;
 	bool rainbow;
 	const char *action;
 	const char *color;
@@ -41,6 +41,7 @@ static const struct json_obj_descr mcp_led_args_descr[] = {
 	JSON_OBJ_DESCR_PRIM(struct mcp_led_args, r, JSON_TOK_NUMBER),
 	JSON_OBJ_DESCR_PRIM(struct mcp_led_args, g, JSON_TOK_NUMBER),
 	JSON_OBJ_DESCR_PRIM(struct mcp_led_args, b, JSON_TOK_NUMBER),
+	JSON_OBJ_DESCR_PRIM(struct mcp_led_args, index, JSON_TOK_NUMBER),
 	JSON_OBJ_DESCR_PRIM(struct mcp_led_args, rainbow, JSON_TOK_TRUE),
 	JSON_OBJ_DESCR_PRIM(struct mcp_led_args, action, JSON_TOK_STRING),
 	JSON_OBJ_DESCR_PRIM(struct mcp_led_args, color, JSON_TOK_STRING),
@@ -183,15 +184,20 @@ static int led_control_tool_callback(enum mcp_tool_event_type event,
 		.r = 0,
 		.g = 0,
 		.b = 0,
+		.index = CONFIG_LED_MATRIX_PIXELS,
 		.rainbow = false
 	};
 	uint8_t str_r = 0, str_g = 0, str_b = 0;
 
-	if ((parsed_bits & BIT(3)) && args.rainbow) {
+	if (parsed_bits & BIT(3)) {
+		msg.index = (uint16_t)CLAMP(args.index, 0, 65535);
+	}
+
+	if ((parsed_bits & BIT(4)) && args.rainbow) {
 		msg.action = LED_ACTION_CUSTOM;
 		msg.rainbow = true;
 		snprintk(response_buffer, sizeof(response_buffer),
-			 "LED set to rainbow mode via Zbus");
+			 "LED set to rainbow mode via Zbus (index: %d)", msg.index);
 	} else if (parse_rgb_string(args.color, &str_r, &str_g, &str_b)) {
 		msg.action = LED_ACTION_CUSTOM;
 		msg.r = str_r;
@@ -199,7 +205,7 @@ static int led_control_tool_callback(enum mcp_tool_event_type event,
 		msg.b = str_b;
 		msg.rainbow = false;
 		snprintk(response_buffer, sizeof(response_buffer),
-			 "LED set to RGB(%d, %d, %d) via Zbus", msg.r, msg.g, msg.b);
+			 "LED set to RGB(%d, %d, %d) via Zbus (index: %d)", msg.r, msg.g, msg.b, msg.index);
 	} else if (parsed_bits & (BIT(0) | BIT(1) | BIT(2))) {
 		msg.action = LED_ACTION_CUSTOM;
 		msg.r = (uint8_t)CLAMP(args.r, 0, 255);
@@ -208,39 +214,42 @@ static int led_control_tool_callback(enum mcp_tool_event_type event,
 		msg.rainbow = args.rainbow;
 		if (msg.rainbow) {
 			snprintk(response_buffer, sizeof(response_buffer),
-				 "LED set to rainbow mode via Zbus");
+				 "LED set to rainbow mode via Zbus (index: %d)", msg.index);
 		} else {
 			snprintk(response_buffer, sizeof(response_buffer),
-				 "LED set to RGB(%d, %d, %d) via Zbus", msg.r, msg.g, msg.b);
+				 "LED set to RGB(%d, %d, %d) via Zbus (index: %d)", msg.r, msg.g, msg.b, msg.index);
 		}
 	} else if (args.action != NULL) {
 		if (strcmp(args.action, "on") == 0) {
 			msg.action = LED_ACTION_ON;
-			snprintk(response_buffer, sizeof(response_buffer), "LED turned ON via Zbus");
+			snprintk(response_buffer, sizeof(response_buffer), "LED turned ON via Zbus (index: %d)", msg.index);
 		} else if (strcmp(args.action, "off") == 0) {
 			msg.action = LED_ACTION_OFF;
-			snprintk(response_buffer, sizeof(response_buffer), "LED turned OFF via Zbus");
+			snprintk(response_buffer, sizeof(response_buffer), "LED turned OFF via Zbus (index: %d)", msg.index);
 		} else if (strcmp(args.action, "toggle") == 0) {
 			msg.action = LED_ACTION_TOGGLE;
-			snprintk(response_buffer, sizeof(response_buffer), "LED toggled via Zbus");
+			snprintk(response_buffer, sizeof(response_buffer), "LED toggled via Zbus (index: %d)", msg.index);
 		} else if (strcmp(args.action, "red") == 0) {
 			msg.action = LED_ACTION_RED;
-			snprintk(response_buffer, sizeof(response_buffer), "LED turned red via Zbus");
+			snprintk(response_buffer, sizeof(response_buffer), "LED turned red via Zbus (index: %d)", msg.index);
 		} else if (strcmp(args.action, "green") == 0) {
 			msg.action = LED_ACTION_GREEN;
-			snprintk(response_buffer, sizeof(response_buffer), "LED turned green via Zbus");
+			snprintk(response_buffer, sizeof(response_buffer), "LED turned green via Zbus (index: %d)", msg.index);
 		} else if (strcmp(args.action, "blue") == 0) {
 			msg.action = LED_ACTION_BLUE;
-			snprintk(response_buffer, sizeof(response_buffer), "LED turned blue via Zbus");
+			snprintk(response_buffer, sizeof(response_buffer), "LED turned blue via Zbus (index: %d)", msg.index);
 		} else if (strcmp(args.action, "rainbow") == 0) {
 			msg.action = LED_ACTION_CUSTOM;
 			msg.rainbow = true;
-			snprintk(response_buffer, sizeof(response_buffer), "LED set to rainbow mode via Zbus");
+			snprintk(response_buffer, sizeof(response_buffer), "LED set to rainbow mode via Zbus (index: %d)", msg.index);
 		} else {
 			valid_action = false;
 			snprintk(response_buffer, sizeof(response_buffer),
-				 "Invalid command. Use r, g, b numbers, 'rgb(r,g,b)', rainbow, or action");
+				 "Invalid command. Use r, g, b numbers, index, 'rgb(r,g,b)', rainbow, or action");
 		}
+	} else if (parsed_bits & BIT(3)) {
+		msg.action = LED_ACTION_CUSTOM;
+		snprintk(response_buffer, sizeof(response_buffer), "LED index set to %d via Zbus", msg.index);
 	} else {
 		action = extract_json_string_value(arguments, "\"action\"");
 		if (action != NULL) {
@@ -265,12 +274,12 @@ static int led_control_tool_callback(enum mcp_tool_event_type event,
 			} else {
 				valid_action = false;
 				snprintk(response_buffer, sizeof(response_buffer),
-					 "Invalid command. Use r, g, b numbers, 'rgb(r,g,b)', rainbow, or action");
+					 "Invalid command. Use r, g, b numbers, index, 'rgb(r,g,b)', rainbow, or action");
 			}
 		} else {
 			valid_action = false;
 			snprintk(response_buffer, sizeof(response_buffer),
-				 "Invalid command. Use r, g, b numbers, 'rgb(r,g,b)', rainbow, or action");
+				 "Invalid command. Use r, g, b numbers, index, 'rgb(r,g,b)', rainbow, or action");
 		}
 	}
 
@@ -303,13 +312,14 @@ static const struct mcp_tool_record led_control_tool = {
 				"\"r\":{\"type\":\"integer\"},"
 				"\"g\":{\"type\":\"integer\"},"
 				"\"b\":{\"type\":\"integer\"},"
+				"\"index\":{\"type\":\"integer\"},"
 				"\"rainbow\":{\"type\":\"boolean\"},"
 				"\"color\":{\"type\":\"string\"},"
 				"\"action\":{\"type\":\"string\"}"
 			"}"
 			"}",
 #ifdef CONFIG_MCP_TOOL_DESC
-			.description = "Controls LED strip. Set r,g,b (0-255), color 'rgb(r,g,b)', rainbow boolean, or action (on/off/toggle/red/green/blue).",
+			.description = "Controls LED strip. Set r,g,b (0-255), index (LED position or 256 for all), color 'rgb(r,g,b)', rainbow boolean, or action (on/off/toggle/red/green/blue).",
 #endif
 #ifdef CONFIG_MCP_TOOL_TITLE
 			.title = "LED Control Tool",
